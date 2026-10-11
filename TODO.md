@@ -7,10 +7,17 @@
   - Paid archive imagery: Pléiades/WorldView 50 cm, about $12–15 per km², so only for small priority zones.
 - [ ] Sharper elevation: LidarBC 1 m DEM (OGL-BC, about 60% of Sea to Sky), filled with NRCan MRDEM-30.
 
-## Phone app (Capacitor wrapping `web/`)
-- [ ] Background GPS hike tracking: record with the screen off, live distance and elevation, save as a route or GPX
-- [ ] Offline areas stored in app storage so the system never clears them
-- [ ] Android build to share directly; iPhone through TestFlight (needs an Apple Developer account)
+## Phone app (`mobile/`, Capacitor)
+- [x] Background GPS hike tracking (tested on the Android emulator: keeps recording with the app in the background)
+- [ ] iPhone: accept the Xcode licence, set the signing team, run on a phone, then TestFlight for friends
+- [ ] Android: a signed release build to share, or the Play Store
+- [ ] Ask for notification permission on Android 13+ so the "Recording" notice always shows
+- [ ] Live stats on the lock screen while recording
+
+## Hike tracking
+- [ ] Follow a planned route while recording, with distance to go and off-route warnings
+- [ ] Share a recording with friends (GPX now; a share link later would need a small server)
+- [ ] Photos and notes along a track
 
 ## Map
 - [ ] Winter map polish: show rock on steep slopes (from the slope tiles) and add tree texture. Land cover from OpenStreetMap is patchy in places; ESA WorldCover could fill the gaps.

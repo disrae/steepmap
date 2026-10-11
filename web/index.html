@@ -29,7 +29,8 @@
   --body:"Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
   --r:14px;
-  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  /* the phone app (Capacitor on Android) sets --safe-area-inset-*; browsers and iOS use env() */
+  --safe-t:var(--safe-area-inset-top,env(safe-area-inset-top,0px)); --safe-b:var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px));
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -128,6 +129,26 @@ input[type=range]{width:100%;accent-color:var(--ice)}
 #btnOffline[data-state="ready"] i::after{content:"";position:absolute;right:5px;top:5px;width:8px;height:8px;border-radius:50%;background:#7be08a;box-shadow:0 0 0 2px var(--ink)}
 #btnOffline[data-state="error"] i::after{content:"";position:absolute;right:5px;top:5px;width:8px;height:8px;border-radius:50%;background:#ffb44d;box-shadow:0 0 0 2px var(--ink)}
 
+/* recording */
+.fab{position:absolute;right:12px;bottom:calc(44px + var(--safe-b));z-index:3;display:flex;align-items:center;gap:8px;height:48px;padding:0 18px 0 14px;border-radius:999px;
+  border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font:700 15px/1 var(--display);letter-spacing:.06em;text-transform:uppercase;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.fab span{width:16px;height:16px;border-radius:50%;background:#ff4d4d;box-shadow:0 0 0 3px rgba(255,77,77,.25)}
+body.has-route .fab{display:none}
+#rec{position:absolute;top:calc(64px + var(--safe-t));left:50%;transform:translateX(-50%);width:min(560px,calc(100% - 24px));z-index:5;padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px}
+#rec .row{justify-content:flex-start}
+#rec .grow{flex:1}
+#recTime{font:600 17px/1 var(--mono)}
+.recdot{width:10px;height:10px;border-radius:50%;background:#ff4d4d;animation:blink 1.4s infinite}
+#rec.paused .recdot{animation:none;background:var(--muted)}
+@keyframes blink{50%{opacity:.25}}
+#recStats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+#recStats div{display:flex;flex-direction:column;gap:4px;min-width:0}
+#recStats .v{font:600 16px/1 var(--mono);white-space:nowrap}
+#recStats .v small{font-size:11px;color:var(--muted);font-weight:400;margin-left:2px}
+body.recording #layers,body.recording #offline,body.recording #saved,body.recording .maplibregl-ctrl-top-right{top:calc(76px + var(--rec-h,110px) + var(--safe-t))}
+body.recording #toast,body.recording #drawHint{top:calc(82px + var(--rec-h,110px) + var(--safe-t))}
+#saved li.rec-item .load span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff7a1a;margin-right:7px;vertical-align:1px}
+
 /* cursor readout */
 #readout{position:absolute;left:12px;bottom:calc(12px + var(--safe-b));padding:8px 12px;display:flex;gap:14px;z-index:2;pointer-events:none}
 #readout div{display:flex;flex-direction:column;gap:3px}
@@ -203,6 +224,11 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
   #readout{bottom:calc(40px + var(--safe-b))}
   #saved{left:12px;right:12px;width:auto}
   #offline{left:12px;right:12px;width:auto;top:auto;bottom:calc(12px + var(--safe-b));max-height:70%}
+  body.recording #layers,body.recording #offline,body.recording #saved{top:auto}
+  .fab{bottom:calc(84px + var(--safe-b))}
+  #recStats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #recStats div:nth-child(n+4){display:none}
+  #recStats .v{font-size:15px}
   #readout{gap:10px}
   #readout .v{font-size:13px}
 }
@@ -274,7 +300,7 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
 <div id="saved" class="panel" hidden>
   <div class="row"><span class="label">My routes</span><label class="btn" style="font-size:12px">Import GPX<input type="file" id="gpxIn" accept=".gpx,application/gpx+xml" hidden></label></div>
   <ul id="savedList"></ul>
-  <span class="small" id="savedEmpty">No saved routes yet. Plan one with the route button, then press Save.</span>
+  <span class="small" id="savedEmpty">Nothing saved yet. Plan a route with the route button, or press Record when you head out.</span>
 </div>
 
 <div id="offline" class="panel" hidden aria-label="Offline maps">
@@ -294,6 +320,21 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
     <span class="small" id="offViewed">Everything you look at is kept too, so places you've browsed work with no signal.</span>
   </div>
 </div>
+
+<button id="btnRec" class="fab" title="Record a hike or tour" aria-label="Record a hike or tour"><span></span>Record</button>
+
+<section id="rec" class="panel" hidden aria-label="Recording">
+  <div class="row"><span class="recdot"></span><span class="label" id="recState">Recording</span><span class="num" id="recTime">0:00:00</span>
+    <span class="grow"></span><button class="btn sm" id="btnRecPause">Pause</button><button class="btn sm primary" id="btnRecStop">Finish</button></div>
+  <div id="recStats">
+    <div><span class="label">Distance</span><span class="v" id="recDist">0</span></div>
+    <div><span class="label">Ascent</span><span class="v" id="recUp">0</span></div>
+    <div><span class="label">Moving</span><span class="v" id="recMoving">0:00:00</span></div>
+    <div><span class="label">Descent</span><span class="v" id="recDown">0</span></div>
+    <div><span class="label">Elevation</span><span class="v" id="recEle">–</span></div>
+  </div>
+  <span class="small" id="recHint"></span>
+</section>
 
 <div id="readout" class="panel" aria-live="off">
   <div><span class="label">Elev</span><span class="v num" id="rElev">–</span></div>
@@ -335,6 +376,7 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/maplibre-contour@0.1.0/dist/index.min.js"></script>
+<script src="vendor/capacitor-8.5.2.js"></script><!-- talks to the phone app's native plugins; does nothing in a browser -->
 <script type="module">
 const $ = (s) => document.querySelector(s);
 /* Map data: every layer is served at /t/<layer>/{z}/{x}/{y} by our Worker (from region packs in R2) and, offline,
@@ -519,6 +561,7 @@ const style = {
     hiking: { type: "raster", tileSize: 256, maxzoom: 18, tiles: ["https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png"], attribution: "Trails © <a href='https://waymarkedtrails.org'>Waymarked Trails</a>" },
     ski: { type: "raster", tileSize: 256, maxzoom: 18, tiles: ["https://tiles.opensnowmap.org/pistes/{z}/{x}/{y}.png"], attribution: "Pistes © <a href='https://opensnowmap.org'>OpenSnowMap</a>" },
     route: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+    track: { type: "geojson", data: { type: "FeatureCollection", features: [] } }, // the track being recorded
   },
   layers: [{ id: "bg", type: "background", paint: { "background-color": "#f4f7fa" } }],
 };
@@ -670,6 +713,8 @@ function themePaint(b) {
 }
 
 style.layers.push(
+  { id: "track-casing", type: "line", source: "track", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#0f1720", "line-width": 7, "line-opacity": 0.55 } },
+  { id: "track-line", type: "line", source: "track", layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#ff7a1a", "line-width": 4 } },
   { id: "route-casing", type: "line", source: "route", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#0f1720", "line-width": 7, "line-opacity": 0.6 } },
   { id: "route-line", type: "line", source: "route", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#7fd3ff", "line-width": 4 } },
   // invisible 44px grab area around each point, so fingers can pick points up
@@ -740,7 +785,9 @@ map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
 })();
 map.on("load", () => {
   applyTerrain();
-  if (innerWidth < 720) document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+  // credits start folded on phones (they'd cover the readout); MapLibre unfolds them as sources load, so fold again once
+  const fold = () => { if (innerWidth < 720) document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show"); };
+  const t0 = Date.now(); fold(); map.on("sourcedata", () => { if (Date.now() - t0 < 15000) fold(); });
   map.on("moveend", () => { const c = map.getCenter(); store.set("view", { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() }); });
 });
 map.on("error", (e) => { if (e && e.error) console.warn(e.error.message || e.error); });
@@ -947,7 +994,7 @@ $("#btnClose").onclick = () => {
     clearTimeout(btn._t); btn._t = setTimeout(resetClose, 3000); return;
   }
   resetClose();
-  pts = []; history = []; routeId = null; savedSig = "[]"; $("#routeName").value = "New route";
+  pts = []; history = []; routeId = null; currentTrack = null; savedSig = "[]"; $("#routeName").value = "New route";
   renderRoute(); setDrawing(false); closeSheet();
 };
 const CLOSE_SVG = $("#btnClose").innerHTML;
@@ -1096,16 +1143,18 @@ cv.addEventListener("pointerleave", () => { hoverI = null; drawProfile(); hoverM
 addEventListener("resize", () => drawProfile());
 
 /* ---------- GPX ---------- */
-function toGpx(name, coords, elev) {
+function toGpx(name, coords, elev, times) {
   const esc = (s) => s.replace(/[<&>"]/g, (c) => ({ "<": "&lt;", "&": "&amp;", ">": "&gt;", '"': "&quot;" })[c]);
-  const trk = coords.map((p, i) => `<trkpt lat="${p[1]}" lon="${p[0]}">${elev && elev[i] != null ? `<ele>${elev[i].toFixed(1)}</ele>` : ""}</trkpt>`).join("\n      ");
+  const trk = coords.map((p, i) => `<trkpt lat="${p[1]}" lon="${p[0]}">${elev && elev[i] != null ? `<ele>${elev[i].toFixed(1)}</ele>` : ""}${times ? `<time>${new Date(times[i]).toISOString()}</time>` : ""}</trkpt>`).join("\n      ");
   return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Steepmap" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk><name>${esc(name)}</name>\n    <trkseg>\n      ${trk}\n    </trkseg>\n  </trk>\n</gpx>\n`;
 }
 $("#btnGpx").onclick = async () => {
   if (pts.length < 2) return toast("Add at least two points first.");
-  const elev = await Promise.all(pts.map((p) => elevAt(p[0], p[1])));
   const name = $("#routeName").value.trim() || "Route";
-  const blob = new Blob([toGpx(name, pts, elev)], { type: "application/gpx+xml" });
+  const t = trackOpen() ? await tracksDb.get(currentTrack.id) : null; // a recording exports every point with its time
+  const coords = t ? t.pts : pts;
+  const elev = t ? t.pts.map((p) => p[2]) : await Promise.all(pts.map((p) => elevAt(p[0], p[1])));
+  const blob = new Blob([toGpx(name, coords, elev, t ? t.pts.map((p) => p[3]) : null)], { type: "application/gpx+xml" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") + ".gpx";
   document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   toast("GPX saved to your downloads.");
@@ -1135,19 +1184,27 @@ function simplify(c, tolM) { // Douglas-Peucker in metres, keeps imported tracks
 
 /* ---------- saved routes ---------- */
 function routes() { return store.get("routes", []); }
-function renderSaved() {
-  const list = routes(); const ul = $("#savedList"); ul.innerHTML = "";
+async function renderSaved() {
+  const plans = routes().map((r) => ({ ...r, type: "plan" })), tracks = (await tracksDb.all().catch(() => [])).map((t) => ({ ...t, type: "track" }));
+  const list = [...plans, ...tracks].sort((a, b) => (b.saved || 0) - (a.saved || 0));
+  const ul = $("#savedList"); ul.innerHTML = "";
   $("#savedEmpty").hidden = list.length > 0;
   for (const r of list) {
     const li = document.createElement("li");
     const b = document.createElement("button"); b.className = "load";
     b.innerHTML = "<span></span><small></small>"; b.firstChild.textContent = r.name;
-    b.lastChild.textContent = `${r.activity === "hike" ? "Hike" : "Ski tour"} · ${(r.km || 0).toFixed(1)} km · ${Math.round(r.up || 0)} m up`;
-    b.onclick = () => { loadRoute(r); setSaved(false); };
+    const kind = r.activity === "hike" ? "Hike" : "Ski tour";
+    b.lastChild.textContent = r.type === "track"
+      ? `Recorded · ${(r.km || 0).toFixed(1)} km · ${Math.round(r.up || 0)} m up · ${fmtDur(((r.endedAt || r.startedAt) - r.startedAt) / 1000).replace(/:\d\d$/, "")}`
+      : `${kind} plan · ${(r.km || 0).toFixed(1)} km · ${Math.round(r.up || 0)} m up`;
+    if (r.type === "track") li.classList.add("rec-item");
+    b.onclick = () => { if (r.type === "track") loadTrack(r); else loadRoute(r); setSaved(false); };
     const del = document.createElement("button"); del.className = "del"; del.title = "Delete"; del.textContent = "✕";
-    del.onclick = () => {
-      if (del.dataset.armed) { store.set("routes", routes().filter((x) => x.id !== r.id)); deleteArea("route-" + r.id); renderSaved(); toast("Route deleted."); }
-      else { del.dataset.armed = 1; del.textContent = "Delete?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3000); }
+    del.onclick = async () => {
+      if (del.dataset.armed) {
+        if (r.type === "track") await tracksDb.del(r.id); else { store.set("routes", routes().filter((x) => x.id !== r.id)); deleteArea("route-" + r.id); }
+        renderSaved(); toast(r.type === "track" ? "Recording deleted." : "Route deleted.");
+      } else { del.dataset.armed = 1; del.textContent = "Delete?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3000); }
     };
     li.append(b, del); ul.append(li);
   }
@@ -1162,8 +1219,13 @@ function loadRoute(r) {
   const b = new maplibregl.LngLatBounds(pts[0], pts[0]); pts.forEach((p) => b.extend(p));
   map.fitBounds(b, { padding: { top: 90, bottom: innerWidth < 720 ? 330 : 300, left: 40, right: innerWidth < 720 ? 40 : 320 }, pitch: 55, duration: 2500, maxZoom: 15 });
 }
-$("#btnSave").onclick = () => {
+$("#btnSave").onclick = async () => {
   if (pts.length < 2) return toast("Add at least two points first.");
+  if (trackOpen()) { // a recorded track: just rename it (edit its points and it saves as a new plan)
+    const t = await tracksDb.get(currentTrack.id);
+    if (t) { t.name = $("#routeName").value.trim() || t.name; t.activity = activity; await tracksDb.put(t); return toast("Recording renamed."); }
+  }
+  currentTrack = null;
   const list = routes(); const id = routeId || Date.now().toString(36);
   let up = 0; if (profile) for (let i = 1; i < profile.samples.length; i++) up += Math.max(0, profile.samples[i].es - profile.samples[i - 1].es);
   const rec = { id, name: $("#routeName").value.trim() || "Route", pts, activity, km: profile ? profile.total / 1000 : 0, up, saved: Date.now() };
@@ -1173,6 +1235,197 @@ $("#btnSave").onclick = () => {
   if (canOffline) { saveArea(routeArea(rec)); toast("Saved. The satellite imagery along it is being kept for offline."); }
   else toast("Saved to My routes on this device.");
 };
+
+/* ---------- recorded tracks: storage ----------
+   Everything stays on this device; there are no accounts. Tracks live in IndexedDB (they're too big for
+   localStorage), including the one being recorded, which is saved as it grows so a closed app loses nothing. */
+const tracksDb = (() => {
+  let open;
+  const db = () => open ||= new Promise((res, rej) => {
+    const r = indexedDB.open("steepmap", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("tracks", { keyPath: "id" });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+  const run = async (mode, fn) => {
+    const d = await db();
+    return new Promise((res, rej) => { const t = d.transaction("tracks", mode), q = fn(t.objectStore("tracks")); t.oncomplete = () => res(q.result); t.onerror = () => rej(t.error); });
+  };
+  return {
+    get: (id) => run("readonly", (s) => s.get(id)),
+    all: () => run("readonly", (s) => s.getAll()).then((l) => l.filter((t) => t.id !== "current")),
+    put: (t) => run("readwrite", (s) => s.put(t)),
+    del: (id) => run("readwrite", (s) => s.delete(id)),
+  };
+})();
+
+/* ---------- GPS ----------
+   One place that hands out position fixes. In a browser that's watchPosition, which phones pause when the
+   screen locks. In the Steepmap phone app (mobile/), the Capacitor background-geolocation plugin keeps
+   recording with the screen off, and shows the "recording" notification Android and iOS require. */
+const CAP = window.capacitorExports;
+const BG_GPS = CAP?.Capacitor?.isNativePlatform?.() ? CAP.registerPlugin("BackgroundGeolocation") : null;
+const gps = {
+  background: !!BG_GPS,
+  async start(onFix, onError) {
+    if (BG_GPS) {
+      const id = await BG_GPS.addWatcher({ backgroundTitle: "Steepmap is recording", backgroundMessage: "Your track keeps recording with the screen off.",
+        requestPermissions: true, stale: false, distanceFilter: 3 },
+      (loc, err) => err ? onError(err) : onFix({ lng: loc.longitude, lat: loc.latitude, acc: loc.accuracy, alt: loc.altitude, t: loc.time || Date.now() }));
+      return () => BG_GPS.removeWatcher({ id });
+    }
+    if (!navigator.geolocation) throw new Error("This browser has no GPS access.");
+    const id = navigator.geolocation.watchPosition(
+      // stamped on arrival: some browsers report cached or oddly scaled fix timestamps
+      (p) => onFix({ lng: p.coords.longitude, lat: p.coords.latitude, acc: p.coords.accuracy, alt: p.coords.altitude, t: Date.now() }),
+      (e) => { if (e.code !== e.TIMEOUT) onError(e); }, // timeouts just mean no fix yet; keep waiting
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 60_000 });
+    return () => navigator.geolocation.clearWatch(id);
+  },
+};
+
+/* ---------- recording ----------
+   A track point is [lng, lat, elevation, time, newSegment]. Elevation comes from the elevation map (steadier
+   than GPS altitude, which wanders by tens of metres); GPS altitude is the fallback. */
+const MAX_ACC = 40;     // metres; rougher fixes move the position dot but don't go in the track
+const CLIMB_STEP = 4;   // metres of change before it counts as ascent or descent (hides elevation noise)
+let recording = null;   // { id, name, activity, startedAt, pts, paused, km, movingSec } while recording
+let stopGps = null, recTick = 0, recSaveT = 0, wake = null, newSeg = false, lastFix = null;
+function climb(points) {
+  let up = 0, down = 0, ref = null;
+  for (const p of points) {
+    if (p[2] == null) continue;
+    if (ref == null || p[4]) { ref = p[2]; continue; }
+    if (p[2] - ref >= CLIMB_STEP) { up += p[2] - ref; ref = p[2]; } else if (ref - p[2] >= CLIMB_STEP) { down += ref - p[2]; ref = p[2]; }
+  }
+  return { up, down };
+}
+function trackStats(t) {
+  let m = 0, moving = 0;
+  for (let i = 1; i < t.pts.length; i++) {
+    const a = t.pts[i - 1], b = t.pts[i]; if (b[4]) continue; // no distance across a pause
+    const d = haversine(a, b), dt = (b[3] - a[3]) / 1000; m += d;
+    if (dt > 0 && dt < 300 && d / dt > 0.3) moving += dt;
+  }
+  const last = t.pts[t.pts.length - 1];
+  return { km: m / 1000, movingSec: moving, ...climb(t.pts), ele: last ? last[2] : null };
+}
+async function keepAwake(on) { // the screen stays on while recording in a browser, so GPS keeps running
+  if (gps.background) on = false; // the app records with the screen off
+  try {
+    if (on && !wake && navigator.wakeLock && document.visibilityState === "visible") { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => (wake = null)); }
+    else if (!on && wake) { await wake.release(); wake = null; }
+  } catch { wake = null; }
+  if (recording) recHint();
+}
+document.addEventListener("visibilitychange", () => { if (recording && !recording.paused) keepAwake(true); });
+
+function onFix(f) {
+  lastFix = f;
+  if (!recording || recording.paused) return;
+  if (f.acc > MAX_ACC) { recHint(`Weak GPS signal (±${Math.round(f.acc)} m). Waiting for a better fix…`); return; }
+  const pts = recording.pts, last = pts[pts.length - 1];
+  if (last && !newSeg) {
+    const d = haversine(last, [f.lng, f.lat]), dt = (f.t - last[3]) / 1000;
+    if (dt <= 0 || d / dt > 40) return;                       // out-of-order fix or a GPS jump
+    if (d < Math.max(3, f.acc / 3) && dt < 30) return;       // standing still: don't pile up jitter
+  }
+  const p = [+f.lng.toFixed(6), +f.lat.toFixed(6), f.alt != null ? +f.alt.toFixed(1) : null, Math.round(f.t), newSeg ? 1 : 0];
+  newSeg = false; pts.push(p);
+  elevAt(p[0], p[1]).then((e) => { if (e != null) { p[2] = +e.toFixed(1); renderRec(); saveRecSoon(); } });
+  renderRec(); drawRecTrack(); saveRecSoon();
+  recHint();
+}
+function saveRecSoon() { clearTimeout(recSaveT); recSaveT = setTimeout(() => recording && tracksDb.put({ ...recording, id: "current", trackId: recording.id }).catch(() => {}), 1500); }
+async function startRecording(resume) {
+  if (!resume) {
+    const now = new Date(), kind = [10, 11, 0, 1, 2, 3].includes(now.getMonth()) ? "ski" : "hike"; // ski season Nov-Apr; rename or switch it after
+    recording = { id: "t" + now.getTime().toString(36), name: `${kind === "ski" ? "Ski tour" : "Hike"} · ${now.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`,
+      activity: kind, startedAt: now.getTime(), pts: [], paused: false };
+    tracksDb.put({ ...recording, id: "current", trackId: recording.id }).catch(() => {});
+  }
+  navigator.storage?.persist?.().catch(() => {});
+  document.body.classList.add("recording");
+  $("#rec").hidden = false; $("#btnRec").hidden = true;
+  if (geolocate._watchState === "OFF" || !geolocate._watchState) geolocate.trigger(); // show and follow your position
+  await resumeGps();
+  clearInterval(recTick); recTick = setInterval(renderRec, 1000);
+  renderRec(); drawRecTrack();
+}
+async function resumeGps() {
+  try { stopGps = await gps.start(onFix, (e) => recHint(e.code === 1 ? "Location is blocked. Allow it for Steepmap in your browser or phone settings." : "GPS error: " + (e.message || e))); }
+  catch (e) { recHint(e.message); }
+  keepAwake(true);
+}
+function pauseRecording(paused) {
+  recording.paused = paused;
+  if (paused) { stopGps?.(); stopGps = null; keepAwake(false); } else { newSeg = recording.pts.length > 0; resumeGps(); }
+  saveRecSoon(); renderRec();
+}
+async function finishRecording() {
+  stopGps?.(); stopGps = null; keepAwake(false); clearInterval(recTick);
+  const t = recording; recording = null;
+  document.body.classList.remove("recording"); $("#rec").hidden = true; $("#btnRec").hidden = false;
+  drawRecTrack();
+  await tracksDb.del("current").catch(() => {});
+  if (t.pts.length < 2) { toast("Nothing recorded yet, so nothing was saved."); return; }
+  Object.assign(t, trackStats(t), { endedAt: t.pts[t.pts.length - 1][3], saved: Date.now() });
+  delete t.paused;
+  await tracksDb.put(t);
+  loadTrack(t);
+  toast("Saved to My routes. Rename it in the box at the top of the panel.", 3500);
+}
+function drawRecTrack() {
+  const src = map.getSource("track"); if (!src) return;
+  const lines = []; let cur = [];
+  for (const p of recording ? recording.pts : []) { if (p[4] && cur.length) { lines.push(cur); cur = []; } cur.push([p[0], p[1]]); }
+  if (cur.length) lines.push(cur);
+  src.setData({ type: "FeatureCollection", features: lines.filter((l) => l.length > 1).map((l) => ({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: l } })) });
+}
+const fmtDur = (s) => { s = Math.max(0, Math.round(s)); return `${Math.floor(s / 3600)}:${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
+function renderRec() {
+  if (!recording) return;
+  const s = trackStats(recording), set = (id, v, u) => { const el = $(id); el.textContent = v; if (u) { const sm = document.createElement("small"); sm.textContent = u; el.append(sm); } };
+  set("#recTime", fmtDur((Date.now() - recording.startedAt) / 1000));
+  s.movingSec = Math.min(s.movingSec, (Date.now() - recording.startedAt) / 1000);
+  set("#recDist", s.km.toFixed(2), "km"); set("#recUp", Math.round(s.up).toLocaleString(), "m"); set("#recDown", Math.round(s.down).toLocaleString(), "m");
+  set("#recEle", s.ele == null ? "–" : Math.round(s.ele).toLocaleString(), s.ele == null ? "" : "m"); set("#recMoving", fmtDur(s.movingSec));
+  $("#recState").textContent = recording.paused ? "Paused" : "Recording";
+  $("#rec").classList.toggle("paused", recording.paused);
+  $("#btnRecPause").textContent = recording.paused ? "Resume" : "Pause";
+}
+function recHint(msg) {
+  $("#recHint").textContent = msg || (recording?.paused ? "Paused. Resume when you're moving again; the gap isn't counted."
+    : gps.background ? "Recording keeps going with the screen off."
+    : recording && !recording.pts.length ? "Waiting for GPS…"
+    : wake ? "The screen stays on while recording (websites lose GPS when the phone locks)."
+    : "Keep this screen open: websites lose GPS when the phone locks.");
+}
+$("#btnRec").onclick = () => startRecording(false);
+new ResizeObserver(() => document.body.style.setProperty("--rec-h", $("#rec").offsetHeight + "px")).observe($("#rec")); // panels and controls sit below it
+$("#btnRecPause").onclick = () => pauseRecording(!recording.paused);
+$("#btnRecStop").onclick = () => {
+  const btn = $("#btnRecStop");
+  if (!btn.dataset.armed) { btn.dataset.armed = 1; btn.textContent = "Finish?"; clearTimeout(btn._t); btn._t = setTimeout(() => { delete btn.dataset.armed; btn.textContent = "Finish"; }, 3000); return; }
+  delete btn.dataset.armed; btn.textContent = "Finish"; finishRecording();
+};
+// pick up a recording that was running when the app closed
+map.once("load", async () => {
+  const cur = await tracksDb.get("current").catch(() => null);
+  if (!cur || !cur.trackId) return;
+  recording = { ...cur, id: cur.trackId }; delete recording.trackId;
+  newSeg = recording.pts.length > 0 && !recording.paused;
+  await startRecording(true);
+  if (recording.paused) { stopGps?.(); stopGps = null; keepAwake(false); }
+  toast(recording.paused ? "Your recording is paused." : "Still recording. Picked up where you left off.");
+});
+
+/* viewing a recorded track: it opens in the route panel, with its real times kept for GPX */
+let currentTrack = null; // { id, sig } while a recorded track is open and unedited
+function loadTrack(t) {
+  loadRoute({ id: null, name: t.name, pts: simplify(t.pts.map((p) => [p[0], p[1]]), 3), activity: t.activity === "ski" ? "ski" : "hike" });
+  currentTrack = { id: t.id, sig: JSON.stringify(pts) }; savedSig = currentTrack.sig;
+}
+const trackOpen = () => currentTrack && JSON.stringify(pts) === currentTrack.sig;
 
 /* ---------- offline maps ----------
    Region packs (trails, topo, elevation, satellite overview) download automatically whenever the app is open

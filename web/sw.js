@@ -5,13 +5,13 @@
 //   Viewed tiles  everything else the map loads, kept so recently viewed places work offline too. Capped in size.
 importScripts("vendor/pmtiles-3.2.1.js");
 
-const SHELL = "steepmap-shell-v3";
+const SHELL = "steepmap-shell-v4";
 const PACKS = "steepmap-packs-v1";
 const SAVED = "steepmap-saved-v1";
 const VIEWED = "steepmap-viewed-v1";
 const KEEP = [SHELL, PACKS, SAVED, VIEWED];
 const VIEWED_MAX = 25000; // tiles (roughly 0.5-1 GB); the oldest go first
-const SHELL_FILES = ["./", "index.html", "regions.json", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png", "vendor/pmtiles-3.2.1.js",
+const SHELL_FILES = ["./", "index.html", "regions.json", "manifest.webmanifest", "icon.svg", "icon-192.png", "icon-512.png", "vendor/pmtiles-3.2.1.js", "vendor/capacitor-8.5.2.js",
   ...["Noto Sans Medium", "Noto Sans Regular", "Noto Sans Italic"].map((f) => `fonts/${f}/0-255.pbf`),
   "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js",
   "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css",

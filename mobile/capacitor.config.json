@@ -1,0 +1,17 @@
+{
+  "appId": "ca.steepmap.app",
+  "appName": "Steepmap",
+  "webDir": "www",
+  "server": {
+    "url": "https://steepmap.ca",
+    "errorPath": "offline.html"
+  },
+  "ios": {
+    "limitsNavigationsToAppBoundDomains": true,
+    "contentInset": "never"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "useLegacyBridge": true
+  }
+}

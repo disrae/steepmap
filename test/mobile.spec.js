@@ -265,3 +265,44 @@ test("the Offline maps panel lists the region and saves the current view for a t
   await expect(panel.locator("#offAreas li")).toHaveCount(0);
   expect(await page.evaluate(async () => (await (await caches.open("steepmap-saved-v1")).keys()).length)).toBe(0);
 });
+
+test("record a hike: GPS fixes become a track that survives closing the app, then saves with times for GPX", async ({ page, context }) => {
+  test.setTimeout(150_000);
+  await context.grantPermissions(["geolocation"]);
+  // a short walk up the Grouse Grind, ~20 m between fixes (fast enough to count as moving, slow enough not to look like a GPS jump)
+  const walk = Array.from({ length: 10 }, (_, i) => ({ longitude: -123.0985 + i * 0.0001, latitude: 49.3655 + i * 0.00015, accuracy: 5 }));
+  const fix = async (p) => { await context.setGeolocation(p); await sleep(1300); };
+  await context.setGeolocation(walk[0]);
+  await openMap(page);
+  await page.locator("#btnRec").tap();
+  await expect(page.locator("#rec")).toBeVisible();
+  for (const p of walk.slice(1, 5)) await fix(p);
+  await expect.poll(async () => parseFloat(await page.locator("#recDist").innerText())).toBeGreaterThan(0.05);
+  await page.screenshot({ path: test.info().outputPath("recording.png") });
+
+  // close and reopen the app mid-hike: the recording carries on
+  await page.reload();
+  await page.waitForFunction(() => window.map?.isStyleLoaded?.(), null, { timeout: 60_000 });
+  await expect(page.locator("#rec")).toBeVisible();
+  const before = parseFloat(await page.locator("#recDist").innerText());
+  expect(before).toBeGreaterThan(0.05);
+  for (const p of walk.slice(5)) await fix(p);
+  await expect.poll(async () => parseFloat(await page.locator("#recDist").innerText())).toBeGreaterThan(before);
+
+  // pause, then finish (Finish asks once)
+  await page.locator("#btnRecPause").tap();
+  await expect(page.locator("#recState")).toHaveText("Paused");
+  await page.locator("#btnRecStop").tap(); await page.locator("#btnRecStop").tap();
+  await expect(page.locator("#rec")).toBeHidden();
+  await expect(page.locator("#sheet")).toBeVisible();
+  await expect(page.locator("#routeName")).toHaveValue(/Hike|Ski tour/);
+
+  const [dl] = await Promise.all([page.waitForEvent("download"), page.locator("#btnGpx").tap()]);
+  const gpx = fs.readFileSync(await dl.path(), "utf8");
+  expect((gpx.match(/<trkpt/g) || []).length).toBeGreaterThanOrEqual(8);
+  expect((gpx.match(/<time>/g) || []).length).toBeGreaterThanOrEqual(8);
+
+  await page.locator("#btnClose").tap();
+  await page.locator("#btnRoutes").tap();
+  await expect(page.locator("#savedList")).toContainText("Recorded");
+});

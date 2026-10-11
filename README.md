@@ -11,6 +11,8 @@ A FATMAP-style 3D backcountry map for ski touring and hiking. It runs in any mod
 - Elevation, slope and aspect under your cursor
 - Route planner: tap to add points, drag to move them. It shows distance, ascent, descent, high point, steepest terrain under the track, and a Munter time estimate (ski tour or hike), plus an elevation profile coloured by slope angle
 - Save routes on your device, import and export GPX
+- Record hikes and tours: distance, ascent and descent (from the elevation map), moving time, with pause and resume. Recordings are saved as they go, so closing the app loses nothing, and export to GPX with timestamps. In a browser the screen stays on while recording; the phone app records with the screen off
+- No accounts: everything you save stays on your device
 - GPS location (the target button)
 - Offline by default. Opening the app online saves the whole region to the phone and keeps it up to date: trails, topo and winter map, 3D terrain, slope shading, contours and a 10 m satellite overview. Everything you look at is kept too. For sharp satellite on a trip, save the view from the Offline maps screen; saving a route also saves the imagery along it
 
@@ -18,7 +20,7 @@ A FATMAP-style 3D backcountry map for ski touring and hiking. It runs in any mod
 - `web/`: the app (a static PWA, no build step). `web/regions.json` lists the regions and their map packs.
 - `worker/`: the Cloudflare Worker. It serves map tiles out of the region packs in R2.
 - `tiles/`: builds the region packs (trails, base map, elevation, satellite). See `tiles/README.md`.
-- `mobile/` (planned): a Capacitor app wrapping `web/` for background GPS tracking and storage the phone never clears.
+- `mobile/`: the phone app (Capacitor) around https://steepmap.ca, adding background GPS recording. See `mobile/README.md`.
 
 ## Run it
 `npm install`, then `npm start` runs the app and the Worker locally at http://localhost:4173. The Worker needs map packs in its local R2 bucket. Build them with `npm run tiles` (needs Docker), then load them with `npm run tiles:upload -- --local`.

@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Steepmap</string>
+    <string name="title_activity_main">Steepmap</string>
+    <string name="package_name">ca.steepmap.app</string>
+    <string name="custom_url_scheme">ca.steepmap.app</string>
+    <!-- the notification shown while a hike is recording (background-geolocation plugin) -->
+    <string name="capacitor_background_geolocation_notification_channel_name">Recording</string>
+</resources>

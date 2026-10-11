@@ -167,3 +167,50 @@ test("after one visit, the map and trails still work with no network", async ({ 
   await expect(page.locator("#brand")).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("offline.png") });
 });
+
+async function tapRoute(page, name, avoid) {
+  const pt = await page.evaluate(([name, avoid]) => {
+    const ids = map.getStyle().layers.map((l) => l.id).filter((id) => /^routes-(hike|ski)-sea/.test(id));
+    const others = avoid ? map.getStyle().layers.map((l) => l.id).filter((id) => new RegExp(avoid).test(id)) : [];
+    for (const f of map.queryRenderedFeatures({ layers: ids })) {
+      if (f.properties.name !== name) continue;
+      const lines = f.geometry.type === "LineString" ? [f.geometry.coordinates] : f.geometry.coordinates;
+      for (const line of lines) for (const c of line) {
+        const p = map.project(c);
+        if (p.x < 60 || p.x > innerWidth - 60 || p.y < 160 || p.y > innerHeight - 160) continue;
+        if (others.length && map.queryRenderedFeatures([[p.x - 18, p.y - 18], [p.x + 18, p.y + 18]], { layers: others }).length) continue;
+        return { x: p.x, y: p.y };
+      }
+    }
+    return null;
+  }, [name, avoid]);
+  expect(pt).not.toBeNull();
+  await page.touchscreen.tap(pt.x, pt.y);
+  return page.locator(".maplibregl-popup .pop");
+}
+
+test("named routes: zoomed out, tapping the Howe Sound Crest Trail shows the route and its length", async ({ page }) => {
+  test.skip(!hasTrails, "web/tiles/sea-to-sky.pmtiles not built yet (npm run trails)");
+  await openMap(page, { center: [-123.18, 49.467], zoom: 10.6, bearing: 0, pitch: 0 }); // below trail zoom: only routes
+  const pop = await tapRoute(page, "Howe Sound Crest Trail", "^(poi-dots|roads|tracks|lifts)");
+  await expect(pop.locator("b")).toHaveText("Howe Sound Crest Trail");
+  await expect(pop).toContainText("Hiking route");
+  await expect(pop).toContainText(/Length\s*2\d(\.\d)? km/);
+  await expect(pop.locator("a")).toHaveAttribute("href", /openstreetmap\.org\/relation\//);
+});
+
+test("named routes: zoomed in, a trail on the Howe Sound Crest says it's part of it", async ({ page }) => {
+  test.skip(!hasTrails, "web/tiles/sea-to-sky.pmtiles not built yet (npm run trails)");
+  await openMap(page, { center: [-123.184, 49.457], zoom: 13, bearing: 0, pitch: 0 }); // on the route
+  const pop = await tapRoute(page, "Howe Sound Crest Trail", "^(poi-dots|lifts)");
+  await expect(pop).toContainText(/Part of[\s\S]*Howe Sound Crest Trail/);
+});
+
+test("ski touring: Hollyburn's winter access trail (tagged hike;skitour) is drawn as a ski tour", async ({ page }) => {
+  test.skip(!hasTrails, "web/tiles/sea-to-sky.pmtiles not built yet (npm run trails)");
+  await openMap(page, { center: [-123.18, 49.375], zoom: 13.5, bearing: 0, pitch: 0 });
+  await expect.poll(() => page.evaluate(() => {
+    const ids = map.getStyle().layers.map((l) => l.id).filter((id) => /^ski-tours-/.test(id));
+    return map.queryRenderedFeatures({ layers: ids }).filter((f) => /Hollyburn/.test(f.properties.name || "")).length;
+  })).toBeGreaterThan(0);
+});

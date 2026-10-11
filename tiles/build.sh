@@ -22,6 +22,14 @@ IFS='|' read -r name area bounds <<<"$line"
 here="$(cd "$(dirname "$0")" && pwd)"
 mkdir -p "$here/data" "$here/../web/tiles"
 
+# Named routes (OSM route relations) come from the Overpass API; see routes_to_geojson.py for why.
+IFS=, read -r west south east north <<<"$bounds"
+echo "Fetching named routes for $name from Overpass..."
+curl -sf --retry 3 --retry-delay 20 --max-time 300 -A "steepmap-tiles/1.0 (+https://steepmap.ca)" \
+  --data-urlencode "data=[out:json][timeout:180];relation[\"type\"=\"route\"][\"route\"~\"^(hiking|foot|ski|piste)\$\"][\"name\"]($south,$west,$north,$east);out geom;" \
+  https://overpass-api.de/api/interpreter -o "$here/data/routes-$name.overpass.json"
+python3 -I "$here/routes_to_geojson.py" "$here/data/routes-$name.overpass.json" "$here/data/routes-$name.geojson"
+
 docker run --rm \
   -v "$here":/tiles:ro \
   -v "$here/data":/data \
@@ -29,6 +37,7 @@ docker run --rm \
   --schema=/tiles/trails.yml \
   --area="$area" \
   --bounds="$bounds" \
+  --routes="/data/routes-$name.geojson" \
   --download \
   --output="/data/$name.pmtiles" \
   --force

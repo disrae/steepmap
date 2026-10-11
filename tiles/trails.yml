@@ -1,13 +1,16 @@
 # Steepmap trail layer: everything you need on top of imagery/topo for backcountry travel,
 # built from OpenStreetMap with Planetiler. See tiles/README.md for how to build a region.
 schema_name: Steepmap trails
-schema_description: Trails, ski tours, lifts, access roads, peaks, huts and water from OpenStreetMap
+schema_description: Trails, named routes, ski tours, lifts, access roads, peaks, huts and water from OpenStreetMap
 attribution: <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>
 
 args:
   area:
     description: Geofabrik area to download (the extract that contains your bounds)
     default: british-columbia
+  routes:
+    description: GeoJSON of named routes (OSM route relations) made by routes_to_geojson.py
+    default: data/routes.geojson
   minzoom: 8
   maxzoom: 14
 
@@ -15,6 +18,9 @@ sources:
   osm:
     type: osm
     url: '${ "geofabrik:" + args.area }'
+  routes:
+    type: geojson
+    local_path: '${ args.routes }'
 
 definitions:
   name: &name
@@ -89,17 +95,24 @@ layers:
           - key: four_wd
             tag_value: 4wd_only
 
-  # Ski runs, nordic trails and ski touring routes (piste:type=skitour).
+  # Ski runs, nordic trails and ski touring routes (piste:type=skitour). Trails often carry
+  # several uses at once (piste:type=hike;skitour), so match anywhere in the value.
   - id: ski
     features:
       - source: osm
         geometry: line
         min_zoom: 10
         include_when:
-          piste:type: [downhill, nordic, skitour, hike, sled, snow_park]
+          piste:type: ["%skitour%", "%downhill%", "%nordic%", "%hike%", "%sled%", "%snow_park%"]
         attributes:
           - key: kind
-            tag_value: piste:type
+            value:
+              skitour: { piste:type: "%skitour%" }
+              downhill: { piste:type: "%downhill%" }
+              nordic: { piste:type: "%nordic%" }
+              hike: { piste:type: "%hike%" }
+              sled: { piste:type: "%sled%" }
+              snow_park: otherwise
           - key: name
             coalesce:
               - tag_value: piste:name
@@ -163,6 +176,29 @@ layers:
             tag_value: fee
           - key: reservation
             tag_value: reservation
+
+  # Named routes: ski traverses, long hikes, nordic and snowshoe loops (from OSM route relations).
+  - id: routes
+    features:
+      - source: routes
+        geometry: line
+        min_zoom: 9
+        attributes:
+          - *name
+          - key: kind
+            tag_value: kind
+          - key: osm_id
+            tag_value: osm_id
+          - key: km
+            tag_value: km
+          - key: difficulty
+            tag_value: difficulty
+          - key: network
+            tag_value: network
+          - key: operator
+            tag_value: operator
+          - key: website
+            tag_value: website
 
   # Names for lakes and glaciers, which imagery doesn't label.
   - id: water_labels

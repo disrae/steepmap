@@ -2,8 +2,7 @@
 
 ## Next
 - [ ] **Offline areas**: draw a box, see the estimated download size, download with progress, list and delete saved areas, and ask the browser to keep the storage permanently (`navigator.storage.persist()`)
-- [ ] **Custom domain** on the `steepmap` Worker
-- [ ] **Rename the GitHub repo** from `FATMAP` to `steepmap` (it's public)
+- [ ] Turn off the workers.dev address (`"workers_dev": false`) once steepmap.ca is confirmed on your devices
 
 ## Phone app (Capacitor wrapping `web/`)
 - [ ] Background GPS hike tracking: record with the screen off, live distance and elevation, save as a route or GPX
@@ -16,4 +15,6 @@
   - Option B: winter look from land cover. White ground, forest from ESA WorldCover drawn as dark texture, rock on steep slopes, then hillshade.
   - FATMAP's winter map was roughly B. Satellite photos taken in winter are rare and patchy, so a styled look tends to beat real winter imagery.
 - [ ] Snap routes to trails while planning
+- [ ] Snowmobile trails from BC Recreation Sites and Trails (Open Government Licence BC): Brohm Ridge, Brandywine, Rutherford, Sproatt. Useful to know about on winter tours
+- [ ] Avalanche terrain ratings (ATES) for known trips, if a source with a usable licence turns up
 - [ ] More trail regions (whole BC, the Rockies, Washington); trail files over 25 MB move to Cloudflare R2

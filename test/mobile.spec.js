@@ -132,3 +132,23 @@ test("tapping a trail shows its details", async ({ page }) => {
   await expect(pop.locator(".k")).not.toBeEmpty();
   await page.screenshot({ path: test.info().outputPath("trail-popup.png") });
 });
+
+test("after one visit, the map and trails still work with no network", async ({ page, context }) => {
+  test.skip(!hasTrails, "web/tiles/sea-to-sky.pmtiles not built yet (npm run trails)");
+  const trailCount = () => page.evaluate(() => map.queryRenderedFeatures({ layers: map.getStyle().layers.map((l) => l.id).filter((id) => /^trails-(solid|dash|dot)-/.test(id)) }).length);
+  await openMap(page);
+  await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, null, { timeout: 30_000 });
+  // reload under the service worker so this visit's tiles and the trail file land in its cache
+  await page.reload();
+  await page.waitForFunction(() => window.map && window.map.isStyleLoaded(), null, { timeout: 60_000 });
+  await expect.poll(trailCount, { timeout: 30_000 }).toBeGreaterThan(0);
+  await settle(page);
+  await sleep(2000); // let cache writes finish
+
+  await context.setOffline(true);
+  await page.reload();
+  await page.waitForFunction(() => window.map && window.map.isStyleLoaded(), null, { timeout: 60_000 });
+  await expect.poll(trailCount, { timeout: 30_000 }).toBeGreaterThan(0);
+  await expect(page.locator("#brand")).toBeVisible();
+  await page.screenshot({ path: test.info().outputPath("offline.png") });
+});

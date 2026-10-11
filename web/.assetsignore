@@ -1,0 +1,2 @@
+# Trail files are served from R2 (npm run tiles:upload), not uploaded with the app.
+tiles/*.pmtiles

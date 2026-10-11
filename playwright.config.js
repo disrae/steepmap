@@ -9,7 +9,7 @@ module.exports = defineConfig({
   workers: 1, // WebGL in software is CPU-heavy; one map at a time keeps gestures smooth
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://localhost:4173",
+    baseURL: process.env.BASE_URL || "http://localhost:4173", // e.g. BASE_URL=http://localhost:8788 to test against `wrangler dev`
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] },
@@ -18,5 +18,5 @@ module.exports = defineConfig({
     { name: "android", use: { ...devices["Pixel 7"] } },
     { name: "iphone-size", use: { ...devices["iPhone 14"], browserName: "chromium" } },
   ],
-  webServer: { command: "npx serve web -l 4173 --no-clipboard", url: "http://localhost:4173", reuseExistingServer: true },
+  webServer: process.env.BASE_URL ? undefined : { command: "npx serve web -l 4173 --no-clipboard", url: "http://localhost:4173", reuseExistingServer: true },
 });

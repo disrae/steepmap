@@ -1,10 +1,18 @@
-// Steepmap on Cloudflare: a static-assets-only Worker serving web/. No server code; `npm run deploy`.
+// Steepmap on Cloudflare. `npm run deploy` publishes the app; `npm run tiles:upload` puts trail files in R2.
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "steepmap",
+  "main": "worker/index.js",
   "compatibility_date": "2026-10-10",
   "assets": {
-    // plain 404s for missing files, so a missing trail file is never answered with the HTML page
-    "directory": "./web"
-  }
+    // the app; trail files are excluded by web/.assetsignore and served from R2 instead.
+    // Plain 404s for missing files, so a missing trail file is never answered with the HTML page.
+    "directory": "./web",
+    "binding": "ASSETS",
+    "run_worker_first": ["/tiles/*"]
+  },
+  "r2_buckets": [
+    { "binding": "TILES", "bucket_name": "steepmap-tiles" }
+  ],
+  "observability": { "enabled": true }
 }

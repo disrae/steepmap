@@ -28,8 +28,15 @@ A FATMAP-style 3D backcountry map for ski touring and hiking. It runs in any mod
 
 GitHub Pages or Cloudflare Pages work too. Any static host does, since there's no server or build step.
 
+## Hosting (Cloudflare)
+The app is a Cloudflare Worker serving `web/` as static files. Trail files live in an R2 bucket (`steepmap-tiles`), and a small script (`worker/index.js`) serves them at `/tiles/...` with byte-range support. There's no other server code.
+
+- `npm run deploy`: publish the app
+- `npm run tiles:upload`: upload the trail files in `web/tiles/` to R2 (after `npm run trails`)
+- `npm run dev`: run the Worker locally (upload trails to the local bucket first with `./tiles/upload.sh --local`)
+
 ## Tests
-`npm install` once, then `npm test`. It runs the app in Chrome emulating an Android phone and an iPhone-sized screen. It does real multi-finger touch (one-finger drag, pinch, twist, two-finger tilt), plans a route with taps, drags a route point with a finger and taps a trail, and checks the layout fits the screen. Screenshots land in `test-results/`; `npm run test:headed` shows the browser while it runs.
+`npm install` once, then `npm test`. Add `BASE_URL=http://localhost:8787` to test against `npm run dev`. It runs the app in Chrome emulating an Android phone and an iPhone-sized screen. It does real multi-finger touch (one-finger drag, pinch, twist, two-finger tilt), plans a route with taps, drags a route point with a finger and taps a trail, and checks the layout fits the screen, and checks that the map and trails still load with the network off after one visit. Screenshots land in `test-results/`; `npm run test:headed` shows the browser while it runs.
 
 ## Where the data comes from (all free, no API keys)
 - Elevation: Mapzen Terrain Tiles on AWS (Terrarium encoding, about 5–30 m resolution depending on the region)

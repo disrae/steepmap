@@ -7,7 +7,9 @@
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "trails": "./tiles/build.sh",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "tiles:upload": "./tiles/upload.sh",
+    "dev": "wrangler dev"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

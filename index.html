@@ -1,0 +1,844 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Steepline</title>
+<meta name="theme-color" content="#0f1720">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+/* Layout: full-bleed 3D map, floating glass panels (search top-left, layers right, route sheet bottom). */
+:root{
+  --ink:#0f1720;           /* night-sky panel base */
+  --glass:rgba(15,23,32,.82);
+  --glass-2:rgba(255,255,255,.07);
+  --line:rgba(255,255,255,.12);
+  --fg:#eef3f7;
+  --muted:#93a3b2;
+  --ice:#7fd3ff;           /* accent: glacier blue */
+  --snow:#ffffff;
+  --s25:#d9e84a; --s30:#f6c21a; --s35:#f07a1a; --s40:#d8282f; --s45:#8b2a9e; --s50:#2b2f6b;
+  --display:"Barlow Condensed", "Arial Narrow", system-ui, sans-serif;
+  --body:"Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --r:14px;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--ink);color:var(--fg);font:14px/1.4 var(--body);overflow:hidden}
+#map{position:absolute;inset:0}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+.panel{background:var(--glass);backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);border:1px solid var(--line);border-radius:var(--r);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.label{font:600 11px/1 var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* top bar */
+#top{position:absolute;top:calc(12px + var(--safe-t));left:12px;right:12px;display:flex;gap:8px;align-items:flex-start;pointer-events:none;z-index:3}
+#top > *{pointer-events:auto}
+#brand{display:flex;align-items:center;gap:8px;padding:8px 12px;height:44px}
+#brand svg{width:22px;height:22px}
+#brand b{font:700 20px/1 var(--display);letter-spacing:.04em}
+#searchWrap{position:relative;flex:1;max-width:380px;min-width:0}
+#search{width:100%;height:44px;padding:0 14px 0 38px;border-radius:var(--r);border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+#search::placeholder{color:var(--muted)}
+#searchWrap svg{position:absolute;left:12px;top:13px;width:18px;height:18px;opacity:.7}
+#results{position:absolute;top:50px;left:0;right:0;padding:6px;display:flex;flex-direction:column;gap:2px;max-height:50vh;overflow:auto}
+#results button{all:unset;cursor:pointer;padding:9px 10px;border-radius:9px;display:block}
+#results button:hover,#results button:focus-visible{background:var(--glass-2)}
+#results small{display:block;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{width:44px;height:44px;display:grid;place-items:center;border-radius:var(--r);border:1px solid var(--line);background:var(--glass);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.iconbtn svg{width:20px;height:20px}
+.iconbtn[aria-pressed="true"]{background:var(--ice);color:var(--ink);border-color:var(--ice)}
+#spacer{flex:1}
+
+/* layers panel */
+#layers{position:absolute;top:calc(64px + var(--safe-t));right:12px;width:270px;max-height:calc(100% - 80px - var(--safe-t) - var(--safe-b));overflow:auto;padding:14px;z-index:3;display:flex;flex-direction:column;gap:14px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:var(--glass-2);padding:4px;border-radius:10px}
+.seg button{border:0;background:none;padding:8px 4px;border-radius:7px;font:600 13px/1 var(--display);letter-spacing:.06em;text-transform:uppercase}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--ink)}
+.toggle{display:flex;align-items:center;gap:10px;padding:4px 0;cursor:pointer}
+.toggle input{appearance:none;width:34px;height:20px;border-radius:20px;background:rgba(255,255,255,.18);position:relative;flex:none;cursor:pointer;transition:background .15s}
+.toggle input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .15s}
+.toggle input:checked{background:var(--ice)}
+.toggle input:checked::after{transform:translateX(14px)}
+.toggle span{flex:1}
+.toggle small{color:var(--muted);font-size:11px;display:block}
+.group{display:flex;flex-direction:column;gap:6px}
+input[type=range]{width:100%;accent-color:var(--ice)}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.legend{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;margin-top:4px}
+.legend div{height:8px;border-radius:2px}
+.legend-l{display:grid;grid-template-columns:repeat(6,1fr);font:500 10px/1 var(--mono);color:var(--muted);margin-top:4px}
+#places{display:flex;flex-wrap:wrap;gap:6px}
+#places button{border:1px solid var(--line);background:var(--glass-2);border-radius:999px;padding:6px 10px;font-size:12px}
+#places button:hover{border-color:var(--ice)}
+.small{font-size:12px;color:var(--muted)}
+.btn{border:1px solid var(--line);background:var(--glass-2);border-radius:10px;padding:8px 12px;font-weight:600}
+.btn:hover{border-color:var(--ice)}
+.btn.primary{background:var(--ice);color:var(--ink);border-color:var(--ice)}
+.btn:disabled{opacity:.4;cursor:default}
+
+/* cursor readout */
+#readout{position:absolute;left:12px;bottom:calc(12px + var(--safe-b));padding:8px 12px;display:flex;gap:14px;z-index:2;pointer-events:none}
+#readout div{display:flex;flex-direction:column;gap:3px}
+#readout .v{font:600 15px/1 var(--mono)}
+body.has-route #readout{display:none}
+
+/* route sheet */
+#sheet{position:absolute;left:12px;right:12px;bottom:calc(12px + var(--safe-b));z-index:3;padding:12px 14px 14px;display:flex;flex-direction:column;gap:10px;max-width:980px;margin:0 auto}
+#sheet[hidden]{display:none}
+#sheetHead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#routeName{flex:1;min-width:120px;background:none;border:0;border-bottom:1px dashed transparent;font:700 20px/1.2 var(--display);letter-spacing:.03em;padding:2px 0}
+#routeName:hover,#routeName:focus{border-bottom-color:var(--line);outline:none}
+#stats{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+#stats div{display:flex;flex-direction:column;gap:4px;min-width:0}
+#stats .v{font:600 17px/1 var(--mono);white-space:nowrap}
+#stats .v small{font-size:11px;color:var(--muted);font-weight:400;margin-left:2px}
+#profileWrap{position:relative;height:130px}
+#profile{width:100%;height:100%;display:block;touch-action:none}
+#profileEmpty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:0 20px}
+#sheetFoot{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+#sheetFoot .grow{flex:1}
+#activity{width:auto}
+#activity.seg{grid-template-columns:repeat(2,auto)}
+#activity.seg button{padding:7px 10px}
+
+/* saved routes */
+#saved{position:absolute;top:calc(64px + var(--safe-t));left:12px;width:300px;max-height:60vh;overflow:auto;padding:12px;z-index:4;display:flex;flex-direction:column;gap:8px}
+#saved ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+#saved li{display:flex;gap:6px;align-items:center}
+#saved li button.load{all:unset;cursor:pointer;flex:1;padding:8px;border-radius:8px;min-width:0}
+#saved li button.load:hover{background:var(--glass-2)}
+#saved li small{display:block;color:var(--muted);font-size:12px}
+#saved li .del{border:0;background:none;color:var(--muted);padding:8px}
+
+#toast{position:absolute;left:50%;top:calc(70px + var(--safe-t));transform:translateX(-50%);padding:10px 16px;z-index:10;font-weight:500;transition:opacity .25s;max-width:calc(100% - 32px)}
+#toast.off{opacity:0;pointer-events:none}
+#drawHint{position:absolute;left:50%;top:calc(70px + var(--safe-t));transform:translateX(-50%);padding:8px 14px;z-index:2;font-size:13px}
+
+/* maplibre overrides */
+.maplibregl-ctrl-group{background:var(--glass)!important;border:1px solid var(--line);border-radius:12px!important;backdrop-filter:blur(14px)}
+.maplibregl-ctrl-group button{width:40px!important;height:40px!important}
+.maplibregl-ctrl-group button+button{border-top:1px solid var(--line)!important}
+.maplibregl-ctrl-group button .maplibregl-ctrl-icon{filter:invert(1)}
+.maplibregl-ctrl-bottom-right{bottom:var(--safe-b)}
+.maplibregl-ctrl-top-right{top:calc(64px + var(--safe-t))}
+.maplibregl-ctrl-scale{background:rgba(15,23,32,.6);color:var(--fg);border-color:var(--fg)}
+.maplibregl-ctrl-attrib{background:rgba(15,23,32,.7)!important;color:var(--muted)}
+.maplibregl-ctrl-attrib a{color:var(--fg)}
+.maplibregl-ctrl-attrib-button{filter:invert(1)}
+body.layers-open .maplibregl-ctrl-top-right{right:290px}
+body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bottom-left{display:none}
+.hover-marker{width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--ice);box-shadow:0 0 0 3px rgba(0,0,0,.3)}
+
+@media (max-width:720px){
+  #brand b{display:none}
+  #brand{padding:8px 10px}
+  #spacer{display:none}
+  #searchWrap{max-width:none}
+  #layers{left:12px;right:12px;width:auto;top:auto;bottom:calc(12px + var(--safe-b));max-height:60%}
+  body.layers-open .maplibregl-ctrl-top-right{right:0}
+  #stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  #profileWrap{height:100px}
+  #saved{left:12px;right:12px;width:auto}
+  #readout{gap:10px}
+  #readout .v{font-size:13px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="map" role="application" aria-label="3D terrain map"></div>
+
+<div id="top">
+  <div id="brand" class="panel" title="Steepline">
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M2 20 9 7l3 5 3-4 7 12H2Z" fill="var(--fg)"/><path d="m9 7 1.6 3L9 9.4 7.6 10.6 9 7Z" fill="var(--ink)"/><path d="M6 20c3-3 6-5 12-6" stroke="var(--ice)" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <b>STEEPLINE</b>
+  </div>
+  <div id="searchWrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="search" type="search" placeholder="Search places" autocomplete="off" aria-label="Search places">
+    <div id="results" class="panel" hidden></div>
+  </div>
+  <div id="spacer"></div>
+  <button id="btnRoutes" class="iconbtn" title="My routes" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+  <button id="btnDraw" class="iconbtn" title="Plan a route" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 17c4-1 3-6 6-8s4-2 4-2"/></svg></button>
+  <button id="btnLayers" class="iconbtn" title="Map layers" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg></button>
+</div>
+
+<div id="layers" class="panel" aria-label="Map layers">
+  <div class="group">
+    <span class="label">Base map</span>
+    <div class="seg" id="basemap">
+      <button data-v="sat" aria-pressed="true">Satellite</button>
+      <button data-v="topo" aria-pressed="false">Topo</button>
+      <button data-v="winter" aria-pressed="false">Winter</button>
+    </div>
+  </div>
+  <div class="group">
+    <span class="label">Overlays</span>
+    <label class="toggle"><input type="checkbox" id="ovSlope" checked><span>Slope angle<small>Avalanche terrain, zoom 11+</small></span></label>
+    <div id="slopeLegend">
+      <div class="legend"><div style="background:var(--s25)"></div><div style="background:var(--s30)"></div><div style="background:var(--s35)"></div><div style="background:var(--s40)"></div><div style="background:var(--s45)"></div><div style="background:var(--s50)"></div></div>
+      <div class="legend-l"><span>25°</span><span>30°</span><span>35°</span><span>40°</span><span>45°</span><span>50°+</span></div>
+    </div>
+    <label class="toggle"><input type="checkbox" id="ovContours" checked><span>Contours</span></label>
+    <label class="toggle"><input type="checkbox" id="ovHillshade"><span>Hillshade</span></label>
+    <label class="toggle"><input type="checkbox" id="ovHiking"><span>Hiking trails<small>Waymarked Trails</small></span></label>
+    <label class="toggle"><input type="checkbox" id="ovSki"><span>Ski runs &amp; tours<small>OpenSnowMap</small></span></label>
+  </div>
+  <div class="group">
+    <div class="row"><span class="label">Terrain</span><label class="toggle" style="padding:0"><span class="small" style="flex:none">3D</span><input type="checkbox" id="ov3d" checked></label></div>
+    <div class="row"><span class="small">Exaggeration</span><span class="num small" id="exagV">1.3×</span></div>
+    <input type="range" id="exag" min="1" max="2.5" step="0.1" value="1.3" aria-label="Terrain exaggeration">
+  </div>
+  <div class="group">
+    <span class="label">Go to</span>
+    <div id="places"></div>
+  </div>
+  <div class="group">
+    <span class="label">Offline</span>
+    <button class="btn" id="btnOffline">Save this area for offline</button>
+    <span class="small" id="offlineMsg">Caches map tiles for what's on screen. Works when the app is hosted on https.</span>
+  </div>
+</div>
+
+<div id="saved" class="panel" hidden>
+  <div class="row"><span class="label">My routes</span><label class="btn" style="font-size:12px">Import GPX<input type="file" id="gpxIn" accept=".gpx,application/gpx+xml" hidden></label></div>
+  <ul id="savedList"></ul>
+  <span class="small" id="savedEmpty">No saved routes yet. Plan one with the route button, then press Save.</span>
+</div>
+
+<div id="readout" class="panel" aria-live="off">
+  <div><span class="label">Elev</span><span class="v num" id="rElev">–</span></div>
+  <div><span class="label">Slope</span><span class="v num" id="rSlope">–</span></div>
+  <div><span class="label">Aspect</span><span class="v num" id="rAspect">–</span></div>
+</div>
+
+<div id="drawHint" class="panel" hidden>Tap the map to add points. Drag a point to move it.</div>
+
+<section id="sheet" class="panel" hidden aria-label="Route">
+  <div id="sheetHead">
+    <input id="routeName" value="New route" aria-label="Route name">
+    <div class="seg" id="activity">
+      <button data-v="ski" aria-pressed="true">Ski tour</button>
+      <button data-v="hike" aria-pressed="false">Hike</button>
+    </div>
+  </div>
+  <div id="stats">
+    <div><span class="label">Distance</span><span class="v" id="sDist">0<small>km</small></span></div>
+    <div><span class="label">Ascent</span><span class="v" id="sUp">0<small>m</small></span></div>
+    <div><span class="label">Descent</span><span class="v" id="sDown">0<small>m</small></span></div>
+    <div><span class="label">High point</span><span class="v" id="sMax">–</span></div>
+    <div><span class="label">Steepest</span><span class="v" id="sSteep">–</span></div>
+    <div><span class="label" title="Munter method">Time est.</span><span class="v" id="sTime">–</span></div>
+  </div>
+  <div id="profileWrap"><canvas id="profile"></canvas><div id="profileEmpty">Add two or more points to see the elevation profile and the slope angle under your track.</div></div>
+  <div id="sheetFoot">
+    <button class="btn" id="btnUndo">Undo</button>
+    <button class="btn" id="btnReverse">Reverse</button>
+    <button class="btn" id="btnClear">Clear</button>
+    <span class="grow"></span>
+    <button class="btn" id="btnGpx">Export GPX</button>
+    <button class="btn primary" id="btnSave">Save</button>
+  </div>
+</section>
+
+<div id="toast" class="panel off" role="status"></div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/maplibre-contour@0.1.0/dist/index.min.js"></script>
+<script>
+"use strict";
+const $ = (s) => document.querySelector(s);
+const DEM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
+const DEM_MAX = 15;
+const SLOPE_CLASSES = [ // [minDeg, rgba]
+  [50, [43, 47, 107, 235]],
+  [45, [139, 42, 158, 225]],
+  [40, [216, 40, 47, 215]],
+  [35, [240, 122, 26, 205]],
+  [30, [246, 194, 26, 190]],
+  [25, [217, 232, 74, 150]],
+];
+const PLACES = [
+  ["Chamonix", [6.885, 45.855], 12.4, -35],
+  ["Rogers Pass", [-117.52, 51.29], 12.2, 20],
+  ["Whistler", [-122.93, 50.06], 12, 160],
+  ["Revelstoke", [-118.16, 50.96], 12, 0],
+  ["Lake Louise", [-116.18, 51.43], 11.8, 0],
+  ["Mt Baker", [-121.81, 48.78], 12, 0],
+  ["Zermatt", [7.66, 45.98], 12.4, -60],
+  ["Tetons", [-110.85, 43.72], 12, 0],
+  ["Hakuba", [137.78, 36.72], 12, 0],
+];
+
+/* ---------- storage helpers (never throw) ---------- */
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+function toast(msg, ms = 2600) {
+  const t = $("#toast"); t.textContent = msg; t.classList.remove("off");
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add("off"), ms);
+}
+
+/* ---------- DEM tile cache + sampling ---------- */
+const demCache = new Map(); // key -> Promise<Float32Array|null>
+function getDem(z, x, y) {
+  const n = 2 ** z; x = ((x % n) + n) % n;
+  if (y < 0 || y >= n) return Promise.resolve(null);
+  const key = z + "/" + x + "/" + y;
+  let p = demCache.get(key);
+  if (p) { demCache.delete(key); demCache.set(key, p); return p; }
+  p = (async () => {
+    const url = DEM_URL.replace("{z}", z).replace("{x}", x).replace("{y}", y);
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const bmp = await createImageBitmap(await res.blob());
+    const c = new OffscreenCanvas(256, 256); const ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(bmp, 0, 0);
+    const d = ctx.getImageData(0, 0, 256, 256).data;
+    const out = new Float32Array(65536);
+    for (let i = 0, j = 0; i < 65536; i++, j += 4) out[i] = d[j] * 256 + d[j + 1] + d[j + 2] / 256 - 32768;
+    return out;
+  })().catch(() => { demCache.delete(key); return null; });
+  p.then((v) => { p.value = v; p.done = true; });
+  demCache.set(key, p);
+  if (demCache.size > 400) demCache.delete(demCache.keys().next().value);
+  return p;
+}
+function lngLatToTile(lng, lat, z) {
+  const n = 2 ** z, r = (lat * Math.PI) / 180;
+  return [((lng + 180) / 360) * n, ((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n];
+}
+function sampleDem(dem, fx, fy) { // bilinear inside one tile (pixel space)
+  const x = Math.min(Math.max(fx - 0.5, 0), 255), y = Math.min(Math.max(fy - 0.5, 0), 255);
+  const x0 = Math.floor(x), y0 = Math.floor(y), x1 = Math.min(x0 + 1, 255), y1 = Math.min(y0 + 1, 255);
+  const tx = x - x0, ty = y - y0;
+  const a = dem[y0 * 256 + x0], b = dem[y0 * 256 + x1], c = dem[y1 * 256 + x0], d = dem[y1 * 256 + x1];
+  return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
+}
+async function elevAt(lng, lat, z = 14) {
+  const [fx, fy] = lngLatToTile(lng, lat, z);
+  const tx = Math.floor(fx), ty = Math.floor(fy);
+  const dem = await getDem(z, tx, ty);
+  return dem ? sampleDem(dem, (fx - tx) * 256, (fy - ty) * 256) : null;
+}
+function elevAtSync(lng, lat, z = 14) {
+  const [fx, fy] = lngLatToTile(lng, lat, z);
+  const tx = Math.floor(fx), ty = Math.floor(fy);
+  const p = demCache.get(z + "/" + tx + "/" + ty);
+  if (!p) { getDem(z, tx, ty); return undefined; }
+  if (!p.done) return undefined;
+  return p.value ? sampleDem(p.value, (fx - tx) * 256, (fy - ty) * 256) : null;
+}
+const M_PER_DEG_LAT = 111320;
+function slopeAspectFrom(get, lng, lat, d = 15) {
+  const dLat = d / M_PER_DEG_LAT, dLng = d / (M_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
+  const e = get(lng + dLng, lat), w = get(lng - dLng, lat), n = get(lng, lat + dLat), s = get(lng, lat - dLat);
+  if ([e, w, n, s].some((v) => v == null)) return null;
+  const dzdx = (e - w) / (2 * d), dzdy = (n - s) / (2 * d);
+  const slope = (Math.atan(Math.hypot(dzdx, dzdy)) * 180) / Math.PI;
+  // aspect = direction the slope faces (downhill), degrees from north
+  let aspect = (Math.atan2(-dzdx, -dzdy) * 180) / Math.PI; if (aspect < 0) aspect += 360;
+  return { slope, aspect };
+}
+const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+const compass = (a) => COMPASS[Math.round(a / 45) % 8];
+
+/* ---------- slope-angle raster tiles (custom protocol) ---------- */
+function slopeColor(deg) { for (const [min, c] of SLOPE_CLASSES) if (deg >= min) return c; return null; }
+async function encodePng(rgba) {
+  const c = new OffscreenCanvas(256, 256);
+  c.getContext("2d").putImageData(new ImageData(rgba, 256, 256), 0, 0);
+  return (await c.convertToBlob({ type: "image/png" })).arrayBuffer();
+}
+maplibregl.addProtocol("slope", async (params) => {
+  const [z, x, y] = params.url.replace("slope://", "").split("/").map(Number);
+  const dem = await getDem(z, x, y);
+  const out = new Uint8ClampedArray(65536 * 4);
+  if (dem) {
+    const n = 2 ** z;
+    for (let r = 0; r < 256; r++) {
+      const lat = Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + (r + 0.5) / 256)) / n)));
+      const px = (40075016.686 * Math.cos(lat)) / (256 * n);
+      const ru = r > 0 ? r - 1 : r, rd = r < 255 ? r + 1 : r;
+      for (let c = 0; c < 256; c++) {
+        const cl = c > 0 ? c - 1 : c, cr = c < 255 ? c + 1 : c;
+        const dzdx = (dem[r * 256 + cr] - dem[r * 256 + cl]) / (px * (cr - cl));
+        const dzdy = (dem[rd * 256 + c] - dem[ru * 256 + c]) / (px * (rd - ru));
+        const deg = (Math.atan(Math.hypot(dzdx, dzdy)) * 180) / Math.PI;
+        const col = slopeColor(deg);
+        if (col) { const i = (r * 256 + c) * 4; out[i] = col[0]; out[i + 1] = col[1]; out[i + 2] = col[2]; out[i + 3] = col[3]; }
+      }
+    }
+  }
+  return { data: await encodePng(out) };
+});
+
+/* ---------- contours ---------- */
+let demSource = null;
+try {
+  demSource = new mlcontour.DemSource({ url: DEM_URL, encoding: "terrarium", maxzoom: 13, worker: true, cacheSize: 120 });
+  demSource.setupMaplibre(maplibregl);
+} catch (e) { console.warn("Contours unavailable", e); }
+
+/* ---------- style ---------- */
+const view = store.get("view", { center: PLACES[0][1], zoom: PLACES[0][2], bearing: PLACES[0][3], pitch: 66 });
+const style = {
+  version: 8,
+  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  sky: {
+    "sky-color": "#6fa8dc", "horizon-color": "#dbe9f4", "fog-color": "#e6eef5",
+    "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.7, "fog-ground-blend": 0.85, "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 12, 0.6, 15, 0.2],
+  },
+  sources: {
+    sat: { type: "raster", tileSize: 256, maxzoom: 19, tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], attribution: "Imagery © Esri, Maxar, Earthstar Geographics" },
+    topo: { type: "raster", tileSize: 256, maxzoom: 17, tiles: ["https://a.tile.opentopomap.org/{z}/{x}/{y}.png", "https://b.tile.opentopomap.org/{z}/{x}/{y}.png", "https://c.tile.opentopomap.org/{z}/{x}/{y}.png"], attribution: "© <a href='https://opentopomap.org'>OpenTopoMap</a> (CC-BY-SA), © OpenStreetMap contributors" },
+    terrain: { type: "raster-dem", encoding: "terrarium", tileSize: 256, maxzoom: DEM_MAX, tiles: [DEM_URL], attribution: "Elevation: Mapzen Terrain Tiles on AWS" },
+    shade: { type: "raster-dem", encoding: "terrarium", tileSize: 256, maxzoom: DEM_MAX, tiles: [DEM_URL] },
+    slope: { type: "raster", tileSize: 256, minzoom: 10, maxzoom: DEM_MAX, tiles: ["slope://{z}/{x}/{y}"] },
+    hiking: { type: "raster", tileSize: 256, maxzoom: 18, tiles: ["https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png"], attribution: "Trails © <a href='https://waymarkedtrails.org'>Waymarked Trails</a>" },
+    ski: { type: "raster", tileSize: 256, maxzoom: 18, tiles: ["https://tiles.opensnowmap.org/pistes/{z}/{x}/{y}.png"], attribution: "Pistes © <a href='https://opensnowmap.org'>OpenSnowMap</a>" },
+    route: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
+  },
+  layers: [
+    { id: "bg", type: "background", paint: { "background-color": "#f4f7fa" } },
+    { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": -0.1, "raster-contrast": 0.08 } },
+    { id: "topo", type: "raster", source: "topo", layout: { visibility: "none" } },
+    { id: "hillshade", type: "hillshade", source: "shade", layout: { visibility: "none" },
+      paint: { "hillshade-exaggeration": 0.6, "hillshade-shadow-color": "#2e4057", "hillshade-highlight-color": "#ffffff", "hillshade-accent-color": "#5b7083", "hillshade-illumination-direction": 315 } },
+    { id: "slope", type: "raster", source: "slope", minzoom: 10, paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0, 11, 0.6], "raster-resampling": "linear", "raster-fade-duration": 150 } },
+    { id: "hiking", type: "raster", source: "hiking", layout: { visibility: "none" }, paint: { "raster-opacity": 0.9 } },
+    { id: "ski", type: "raster", source: "ski", layout: { visibility: "none" } },
+  ],
+};
+if (demSource) {
+  style.sources.contours = { type: "vector", maxzoom: 15, tiles: [demSource.contourProtocolUrl({ thresholds: { 10: [200, 1000], 11: [100, 500], 12: [50, 250], 13: [20, 100], 14: [20, 100], 15: [10, 50] }, contourLayer: "contours", elevationKey: "ele", levelKey: "level", extent: 4096, buffer: 1 })] };
+  style.layers.push(
+    { id: "contour-lines", type: "line", source: "contours", "source-layer": "contours", minzoom: 10,
+      paint: { "line-color": "rgba(255,255,255,0.55)", "line-width": ["match", ["get", "level"], 1, 1.1, 0.5] } },
+    { id: "contour-labels", type: "symbol", source: "contours", "source-layer": "contours", minzoom: 12, filter: [">", ["get", "level"], 0],
+      layout: { "symbol-placement": "line", "text-size": 11, "text-field": ["concat", ["number-format", ["get", "ele"], {}], " m"], "text-font": ["Open Sans Semibold"] },
+      paint: { "text-color": "#ffffff", "text-halo-color": "rgba(15,23,32,0.75)", "text-halo-width": 1.2 } });
+}
+style.layers.push(
+  { id: "route-casing", type: "line", source: "route", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#0f1720", "line-width": 7, "line-opacity": 0.6 } },
+  { id: "route-line", type: "line", source: "route", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#7fd3ff", "line-width": 4 } },
+  { id: "route-pts", type: "circle", source: "route", filter: ["==", ["geometry-type"], "Point"],
+    paint: { "circle-radius": ["case", ["==", ["get", "i"], 0], 7, 5], "circle-color": ["case", ["==", ["get", "i"], 0], "#7fd3ff", "#ffffff"], "circle-stroke-color": "#0f1720", "circle-stroke-width": 2 } },
+);
+
+/* ---------- map ---------- */
+const map = new maplibregl.Map({
+  container: "map", style, center: view.center, zoom: view.zoom, bearing: view.bearing, pitch: view.pitch,
+  maxPitch: 85, attributionControl: { compact: true }, fadeDuration: 150,
+});
+window.map = map;
+map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+const geolocate = new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true, showAccuracyCircle: true });
+map.addControl(geolocate, "top-right");
+map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
+map.on("load", () => {
+  applyTerrain();
+  map.on("moveend", () => { const c = map.getCenter(); store.set("view", { center: [c.lng, c.lat], zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() }); });
+});
+map.on("error", (e) => { if (e && e.error) console.warn(e.error.message || e.error); });
+
+/* ---------- layer controls ---------- */
+const prefs = Object.assign({ basemap: "sat", slope: true, contours: true, hillshade: false, hiking: false, ski: false, three: true, exag: 1.3 }, store.get("prefs", {}));
+const savePrefs = () => store.set("prefs", prefs);
+function vis(id, on) { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); }
+function applyBasemap() {
+  const b = prefs.basemap;
+  vis("sat", b === "sat"); vis("topo", b === "topo");
+  // Winter: a clean white relief, the shading does the work.
+  const winter = b === "winter";
+  vis("hillshade", winter || prefs.hillshade);
+  if (map.getLayer("hillshade")) {
+    map.setPaintProperty("hillshade", "hillshade-exaggeration", winter ? 0.75 : 0.45);
+    map.setPaintProperty("hillshade", "hillshade-accent-color", winter ? "#8aa0b4" : "#5b7083");
+  }
+  if (map.getLayer("contour-lines")) {
+    const dark = b !== "sat";
+    map.setPaintProperty("contour-lines", "line-color", dark ? "rgba(70,90,110,0.55)" : "rgba(255,255,255,0.55)");
+    map.setPaintProperty("contour-labels", "text-color", dark ? "#2d4155" : "#ffffff");
+    map.setPaintProperty("contour-labels", "text-halo-color", dark ? "rgba(255,255,255,0.85)" : "rgba(15,23,32,0.75)");
+  }
+  document.querySelectorAll("#basemap button").forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === b));
+}
+function applyOverlays() {
+  vis("slope", prefs.slope); $("#slopeLegend").hidden = !prefs.slope;
+  vis("contour-lines", prefs.contours); vis("contour-labels", prefs.contours);
+  vis("hiking", prefs.hiking); vis("ski", prefs.ski);
+  applyBasemap();
+}
+function applyTerrain() {
+  map.setTerrain(prefs.three ? { source: "terrain", exaggeration: prefs.exag } : null);
+  $("#exagV").textContent = prefs.exag.toFixed(1) + "×";
+}
+for (const [id, key] of [["ovSlope", "slope"], ["ovContours", "contours"], ["ovHillshade", "hillshade"], ["ovHiking", "hiking"], ["ovSki", "ski"]]) {
+  const el = $("#" + id); el.checked = prefs[key];
+  el.addEventListener("change", () => { prefs[key] = el.checked; savePrefs(); applyOverlays(); });
+}
+$("#ov3d").checked = prefs.three;
+$("#ov3d").addEventListener("change", (e) => {
+  prefs.three = e.target.checked; savePrefs(); applyTerrain();
+  map.easeTo({ pitch: prefs.three ? 60 : 0, duration: 800 });
+});
+$("#exag").value = prefs.exag;
+$("#exag").addEventListener("input", (e) => { prefs.exag = +e.target.value; savePrefs(); if (prefs.three) applyTerrain(); else $("#exagV").textContent = prefs.exag.toFixed(1) + "×"; });
+document.querySelectorAll("#basemap button").forEach((b) => b.addEventListener("click", () => { prefs.basemap = b.dataset.v; savePrefs(); applyBasemap(); }));
+map.on("load", applyOverlays);
+
+for (const [name, center, zoom, bearing] of PLACES) {
+  const b = document.createElement("button"); b.textContent = name;
+  b.onclick = () => { map.flyTo({ center, zoom, bearing, pitch: 66, duration: 3500, essential: true }); if (innerWidth < 720) setLayers(false); };
+  $("#places").append(b);
+}
+function setLayers(open) {
+  $("#layers").hidden = !open; $("#btnLayers").setAttribute("aria-pressed", open);
+  document.body.classList.toggle("layers-open", open);
+}
+setLayers(innerWidth >= 720);
+$("#btnLayers").onclick = () => { setLayers($("#layers").hidden); if (!$("#layers").hidden) setSaved(false); };
+
+/* ---------- search (Nominatim) ---------- */
+let searchT;
+$("#search").addEventListener("input", (e) => {
+  clearTimeout(searchT); const q = e.target.value.trim();
+  if (q.length < 3) { $("#results").hidden = true; return; }
+  searchT = setTimeout(() => doSearch(q), 450);
+});
+$("#search").addEventListener("keydown", (e) => { if (e.key === "Enter") { clearTimeout(searchT); doSearch(e.target.value.trim()); } if (e.key === "Escape") $("#results").hidden = true; });
+async function doSearch(q) {
+  if (!q) return;
+  const r = $("#results");
+  try {
+    const res = await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=7&q=" + encodeURIComponent(q));
+    const list = await res.json();
+    r.innerHTML = "";
+    if (!list.length) { r.innerHTML = '<div class="small" style="padding:9px 10px">No places found. Try a peak, hut or town name.</div>'; }
+    for (const p of list) {
+      const b = document.createElement("button");
+      const name = p.name || p.display_name.split(",")[0];
+      b.innerHTML = "<span></span><small></small>";
+      b.firstChild.textContent = name; b.lastChild.textContent = p.display_name;
+      b.onclick = () => {
+        r.hidden = true; $("#search").value = name;
+        map.flyTo({ center: [+p.lon, +p.lat], zoom: p.type === "peak" ? 13.5 : 12.5, pitch: 66, duration: 3500, essential: true });
+      };
+      r.append(b);
+    }
+    r.hidden = false;
+  } catch { r.innerHTML = '<div class="small" style="padding:9px 10px">Search is offline. Check your connection.</div>'; r.hidden = false; }
+}
+document.addEventListener("click", (e) => { if (!e.target.closest("#searchWrap")) $("#results").hidden = true; });
+
+/* ---------- cursor readout ---------- */
+let roRAF = 0, lastLL = null, roTries = 0;
+function updateReadout(retry) {
+  roRAF = 0; if (!lastLL) return;
+  roTries = retry === true ? roTries + 1 : 0;
+  const { lng, lat } = lastLL;
+  const z = Math.min(14, Math.max(10, Math.round(map.getZoom())));
+  const get = (a, b) => elevAtSync(a, b, z);
+  const e = get(lng, lat);
+  $("#rElev").textContent = e == null ? "–" : Math.round(e) + " m";
+  const sa = slopeAspectFrom(get, lng, lat, Math.max(10, 4 * (40075016.686 * Math.cos((lat * Math.PI) / 180)) / (256 * 2 ** z)));
+  $("#rSlope").textContent = sa ? sa.slope.toFixed(0) + "°" : "–";
+  $("#rAspect").textContent = sa && sa.slope > 3 ? compass(sa.aspect) : "–";
+  if ((e === undefined || (sa === null && e != null)) && roTries < 25) setTimeout(() => { if (!roRAF) roRAF = requestAnimationFrame(() => updateReadout(true)); }, 120);
+}
+map.on("mousemove", (e) => { lastLL = e.lngLat; if (!roRAF) roRAF = requestAnimationFrame(updateReadout); });
+map.on("click", (e) => { if (!drawing) { lastLL = e.lngLat; updateReadout(); } });
+
+/* ---------- route planning ---------- */
+let drawing = false, pts = [], history = [], profile = null, activity = "ski", routeId = null;
+const hoverMarker = new maplibregl.Marker({ element: Object.assign(document.createElement("div"), { className: "hover-marker" }) });
+function haversine(a, b) {
+  const R = 6371008.8, r = Math.PI / 180;
+  const dLat = (b[1] - a[1]) * r, dLng = (b[0] - a[0]) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * r) * Math.cos(b[1] * r) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+function pushHistory() { history.push(pts.map((p) => p.slice())); if (history.length > 100) history.shift(); }
+function setDrawing(on) {
+  drawing = on; $("#btnDraw").setAttribute("aria-pressed", on);
+  $("#drawHint").hidden = !on || pts.length > 1;
+  map.getCanvas().style.cursor = on ? "crosshair" : "";
+  if (on) { $("#sheet").hidden = false; document.body.classList.add("has-route"); if (innerWidth < 720) setLayers(false); setSaved(false); }
+  else if (!pts.length) closeSheet();
+  if (on) map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
+}
+function closeSheet() { $("#sheet").hidden = true; document.body.classList.remove("has-route"); hoverMarker.remove(); }
+$("#btnDraw").onclick = () => setDrawing(!drawing);
+function renderRoute() {
+  const feats = [];
+  if (pts.length > 1) feats.push({ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: pts } });
+  const step = pts.length > 200 ? Math.ceil(pts.length / 200) : 1; // keep imported tracks light
+  pts.forEach((p, i) => { if (i % step === 0 || i === pts.length - 1) feats.push({ type: "Feature", properties: { i }, geometry: { type: "Point", coordinates: p } }); });
+  const src = map.getSource("route"); if (src) src.setData({ type: "FeatureCollection", features: feats });
+  $("#drawHint").hidden = !drawing || pts.length > 1;
+  scheduleProfile();
+}
+map.on("click", (e) => {
+  if (!drawing || dragIdx !== null) return;
+  if (map.queryRenderedFeatures(e.point, { layers: ["route-pts"] }).length) return;
+  pushHistory(); pts.push([+e.lngLat.lng.toFixed(6), +e.lngLat.lat.toFixed(6)]); renderRoute();
+});
+// drag vertices (mouse + touch)
+let dragIdx = null;
+function startDrag(e) {
+  if (!drawing) return;
+  const f = e.features && e.features[0]; if (!f) return;
+  e.preventDefault(); dragIdx = f.properties.i; pushHistory();
+  map.getCanvas().style.cursor = "grabbing";
+  const move = (ev) => { pts[dragIdx] = [+ev.lngLat.lng.toFixed(6), +ev.lngLat.lat.toFixed(6)]; renderRoute(); };
+  const up = () => { map.off("mousemove", move); map.off("touchmove", move); setTimeout(() => (dragIdx = null), 0); map.getCanvas().style.cursor = "crosshair"; };
+  map.on("mousemove", move); map.on("touchmove", move);
+  map.once("mouseup", up); map.once("touchend", up);
+}
+map.on("mousedown", "route-pts", startDrag);
+map.on("touchstart", "route-pts", startDrag);
+map.on("mouseenter", "route-pts", () => { if (drawing) map.getCanvas().style.cursor = "grab"; });
+map.on("mouseleave", "route-pts", () => { if (drawing && dragIdx === null) map.getCanvas().style.cursor = "crosshair"; });
+
+$("#btnUndo").onclick = () => { if (history.length) { pts = history.pop(); renderRoute(); } };
+$("#btnReverse").onclick = () => { if (pts.length > 1) { pushHistory(); pts.reverse(); renderRoute(); } };
+$("#btnClear").onclick = () => { if (!pts.length) return; pushHistory(); pts = []; routeId = null; $("#routeName").value = "New route"; renderRoute(); toast("Route cleared. Undo brings it back."); };
+document.querySelectorAll("#activity button").forEach((b) => b.addEventListener("click", () => {
+  activity = b.dataset.v; document.querySelectorAll("#activity button").forEach((x) => x.setAttribute("aria-pressed", x === b)); updateStats();
+}));
+
+/* profile computation */
+let profT, profToken = 0;
+function scheduleProfile() { clearTimeout(profT); profT = setTimeout(computeProfile, 120); }
+async function computeProfile() {
+  const token = ++profToken;
+  if (pts.length < 2) { profile = null; drawProfile(); updateStats(); return; }
+  let total = 0; const segLen = [];
+  for (let i = 1; i < pts.length; i++) { const d = haversine(pts[i - 1], pts[i]); segLen.push(d); total += d; }
+  const step = Math.max(10, total / 500);
+  const samples = []; let acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], L = segLen[i - 1], n = Math.max(1, Math.ceil(L / step));
+    for (let k = i === 1 ? 0 : 1; k <= n; k++) {
+      const t = k / n; samples.push({ ll: [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], d: acc + L * t });
+    }
+    acc += L;
+  }
+  const z = 14;
+  await Promise.all(samples.map(async (s) => { s.e = await elevAt(s.ll[0], s.ll[1], z); }));
+  if (token !== profToken) return;
+  const get = (a, b) => elevAtSync(a, b, z);
+  for (const s of samples) {
+    if (s.e == null) s.e = 0;
+    let sa = slopeAspectFrom(get, s.ll[0], s.ll[1], 20);
+    if (!sa) { await Promise.all([[20, 0], [-20, 0], [0, 20], [0, -20]].map(([dx, dy]) => elevAt(s.ll[0] + dx / (M_PER_DEG_LAT * Math.cos((s.ll[1] * Math.PI) / 180)), s.ll[1] + dy / M_PER_DEG_LAT, z))); sa = slopeAspectFrom(get, s.ll[0], s.ll[1], 20); }
+    s.slope = sa ? sa.slope : 0;
+  }
+  if (token !== profToken) return;
+  // light smoothing for ascent totals (DEM noise)
+  const sm = samples.map((s, i) => { let t = 0, c = 0; for (let j = Math.max(0, i - 2); j <= Math.min(samples.length - 1, i + 2); j++) { t += samples[j].e; c++; } return t / c; });
+  samples.forEach((s, i) => (s.es = sm[i]));
+  profile = { samples, total };
+  updateStats(); drawProfile();
+}
+function fmtTime(h) { if (!isFinite(h) || h <= 0) return "–"; const hh = Math.floor(h), mm = Math.round((h - hh) * 60); return mm === 60 ? `${hh + 1}h00` : `${hh}h${String(mm).padStart(2, "0")}`; }
+function updateStats() {
+  const set = (id, v, u) => { $(id).innerHTML = ""; $(id).append(v); if (u) { const s = document.createElement("small"); s.textContent = u; $(id).append(s); } };
+  if (!profile) { set("#sDist", "0", "km"); set("#sUp", "0", "m"); set("#sDown", "0", "m"); set("#sMax", "–"); set("#sSteep", "–"); set("#sTime", "–"); return; }
+  const S = profile.samples; let up = 0, down = 0, max = -1e9, steep = 0, hours = 0;
+  // Munter: units = km + 100 m vertical; rates per activity
+  const rate = activity === "ski" ? { up: 4, down: 10 } : { up: 4, down: 6 };
+  for (let i = 1; i < S.length; i++) {
+    const dz = S[i].es - S[i - 1].es, km = (S[i].d - S[i - 1].d) / 1000;
+    if (dz > 0) up += dz; else down -= dz;
+    hours += (km + Math.abs(dz) / 100) / (dz > 0 ? rate.up : rate.down);
+  }
+  for (const s of S) { max = Math.max(max, s.e); steep = Math.max(steep, s.slope); }
+  set("#sDist", (profile.total / 1000).toFixed(profile.total < 10000 ? 2 : 1), "km");
+  set("#sUp", Math.round(up).toLocaleString(), "m"); set("#sDown", Math.round(down).toLocaleString(), "m");
+  set("#sMax", Math.round(max).toLocaleString(), "m"); set("#sSteep", Math.round(steep) + "°"); set("#sTime", fmtTime(hours));
+}
+/* profile drawing */
+const cv = $("#profile"); let hoverI = null;
+const PAD = { l: 44, r: 8, t: 10, b: 20 };
+function slopeCss(deg) { const c = slopeColor(deg); return c ? `rgb(${c[0]},${c[1]},${c[2]})` : "rgba(127,211,255,.55)"; }
+function drawProfile() {
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  $("#profileEmpty").hidden = !!profile;
+  if (!profile) return;
+  const S = profile.samples;
+  let lo = Infinity, hi = -Infinity; for (const s of S) { lo = Math.min(lo, s.e); hi = Math.max(hi, s.e); }
+  const span = Math.max(hi - lo, 50); const nice = span > 1500 ? 500 : span > 600 ? 200 : span > 250 ? 100 : 50;
+  lo = Math.floor((lo - span * 0.08) / nice) * nice; hi = Math.ceil((hi + span * 0.05) / nice) * nice;
+  const X = (d) => PAD.l + (d / profile.total) * (W - PAD.l - PAD.r);
+  const Y = (e) => PAD.t + (1 - (e - lo) / (hi - lo)) * (H - PAD.t - PAD.b);
+  g.font = "10px JetBrains Mono, monospace"; g.fillStyle = "#93a3b2"; g.strokeStyle = "rgba(255,255,255,.08)"; g.lineWidth = 1;
+  for (let v = lo; v <= hi; v += nice) { const y = Math.round(Y(v)) + 0.5; g.beginPath(); g.moveTo(PAD.l, y); g.lineTo(W - PAD.r, y); g.stroke(); g.textAlign = "right"; g.fillText(v + " m", PAD.l - 6, y + 3); }
+  const kmStep = [0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50].find((k) => profile.total / 1000 / k <= 8) || 100;
+  g.textAlign = "center";
+  for (let k = 0; k * 1000 <= profile.total; k += kmStep) g.fillText((+(k).toFixed(2)) + " km", Math.min(X(k * 1000), W - 22), H - 5);
+  // filled columns coloured by terrain slope under the track
+  for (let i = 1; i < S.length; i++) {
+    const x0 = X(S[i - 1].d), x1 = X(S[i].d) + 0.6;
+    g.fillStyle = slopeCss(S[i].slope); g.globalAlpha = 0.85;
+    g.beginPath(); g.moveTo(x0, Y(S[i - 1].e)); g.lineTo(x1, Y(S[i].e)); g.lineTo(x1, H - PAD.b); g.lineTo(x0, H - PAD.b); g.closePath(); g.fill();
+  }
+  g.globalAlpha = 1; g.strokeStyle = "#ffffff"; g.lineWidth = 1.6; g.beginPath();
+  S.forEach((s, i) => (i ? g.lineTo(X(s.d), Y(s.e)) : g.moveTo(X(s.d), Y(s.e)))); g.stroke();
+  if (hoverI != null && S[hoverI]) {
+    const s = S[hoverI], x = X(s.d);
+    g.strokeStyle = "rgba(255,255,255,.7)"; g.beginPath(); g.moveTo(x, PAD.t); g.lineTo(x, H - PAD.b); g.stroke();
+    const txt = `${(s.d / 1000).toFixed(2)} km · ${Math.round(s.e)} m · ${Math.round(s.slope)}°`;
+    g.font = "600 11px JetBrains Mono, monospace"; const tw = g.measureText(txt).width + 12;
+    const bx = Math.min(Math.max(x - tw / 2, PAD.l), W - PAD.r - tw);
+    g.fillStyle = "rgba(15,23,32,.92)"; g.fillRect(bx, PAD.t, tw, 18); g.fillStyle = "#fff"; g.textAlign = "left"; g.fillText(txt, bx + 6, PAD.t + 13);
+  }
+}
+function profileHover(clientX) {
+  if (!profile) return;
+  const r = cv.getBoundingClientRect(); const W = r.width;
+  const d = ((clientX - r.left - PAD.l) / (W - PAD.l - PAD.r)) * profile.total;
+  const S = profile.samples; let best = 0;
+  for (let i = 0; i < S.length; i++) if (Math.abs(S[i].d - d) < Math.abs(S[best].d - d)) best = i;
+  hoverI = best; drawProfile(); hoverMarker.setLngLat(S[best].ll).addTo(map);
+}
+cv.addEventListener("pointermove", (e) => profileHover(e.clientX));
+cv.addEventListener("pointerdown", (e) => profileHover(e.clientX));
+cv.addEventListener("pointerleave", () => { hoverI = null; drawProfile(); hoverMarker.remove(); });
+addEventListener("resize", () => drawProfile());
+
+/* ---------- GPX ---------- */
+function toGpx(name, coords, elev) {
+  const esc = (s) => s.replace(/[<&>"]/g, (c) => ({ "<": "&lt;", "&": "&amp;", ">": "&gt;", '"': "&quot;" })[c]);
+  const trk = coords.map((p, i) => `<trkpt lat="${p[1]}" lon="${p[0]}">${elev && elev[i] != null ? `<ele>${elev[i].toFixed(1)}</ele>` : ""}</trkpt>`).join("\n      ");
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Steepline" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk><name>${esc(name)}</name>\n    <trkseg>\n      ${trk}\n    </trkseg>\n  </trk>\n</gpx>\n`;
+}
+$("#btnGpx").onclick = async () => {
+  if (pts.length < 2) return toast("Add at least two points first.");
+  const elev = await Promise.all(pts.map((p) => elevAt(p[0], p[1], 14)));
+  const name = $("#routeName").value.trim() || "Route";
+  const blob = new Blob([toGpx(name, pts, elev)], { type: "application/gpx+xml" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") + ".gpx";
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast("GPX saved to your downloads.");
+};
+$("#gpxIn").addEventListener("change", async (e) => {
+  const f = e.target.files[0]; if (!f) return; e.target.value = "";
+  const doc = new DOMParser().parseFromString(await f.text(), "application/xml");
+  let nodes = [...doc.getElementsByTagName("trkpt")]; if (!nodes.length) nodes = [...doc.getElementsByTagName("rtept")];
+  const coords = nodes.map((n) => [+(+n.getAttribute("lon")).toFixed(6), +(+n.getAttribute("lat")).toFixed(6)]).filter((p) => isFinite(p[0]) && isFinite(p[1]));
+  if (coords.length < 2) return toast("That file has no track or route points.");
+  const nameEl = doc.querySelector("trk > name, rte > name, metadata > name");
+  loadRoute({ id: null, name: nameEl ? nameEl.textContent : f.name.replace(/\.gpx$/i, ""), pts: simplify(coords, 3), activity });
+  toast(`Imported ${coords.length.toLocaleString()} points.`);
+});
+function simplify(c, tolM) { // Douglas-Peucker in metres, keeps imported tracks editable
+  if (c.length < 3) return c;
+  const lat0 = (c[0][1] * Math.PI) / 180, kx = 111320 * Math.cos(lat0), ky = 110540;
+  const P = c.map((p) => [p[0] * kx, p[1] * ky]); const keep = new Uint8Array(c.length); keep[0] = keep[c.length - 1] = 1;
+  const stack = [[0, c.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop(); let md = 0, mi = -1; const [ax, ay] = P[a], [bx, by] = P[b]; const dx = bx - ax, dy = by - ay, L = Math.hypot(dx, dy) || 1;
+    for (let i = a + 1; i < b; i++) { const d = Math.abs(dy * P[i][0] - dx * P[i][1] + bx * ay - by * ax) / L; if (d > md) { md = d; mi = i; } }
+    if (md > tolM) { keep[mi] = 1; stack.push([a, mi], [mi, b]); }
+  }
+  return c.filter((_, i) => keep[i]);
+}
+
+/* ---------- saved routes ---------- */
+function routes() { return store.get("routes", []); }
+function renderSaved() {
+  const list = routes(); const ul = $("#savedList"); ul.innerHTML = "";
+  $("#savedEmpty").hidden = list.length > 0;
+  for (const r of list) {
+    const li = document.createElement("li");
+    const b = document.createElement("button"); b.className = "load";
+    b.innerHTML = "<span></span><small></small>"; b.firstChild.textContent = r.name;
+    b.lastChild.textContent = `${r.activity === "hike" ? "Hike" : "Ski tour"} · ${(r.km || 0).toFixed(1)} km · ${Math.round(r.up || 0)} m up`;
+    b.onclick = () => { loadRoute(r); setSaved(false); };
+    const del = document.createElement("button"); del.className = "del"; del.title = "Delete"; del.textContent = "✕";
+    del.onclick = () => {
+      if (del.dataset.armed) { store.set("routes", routes().filter((x) => x.id !== r.id)); renderSaved(); toast("Route deleted."); }
+      else { del.dataset.armed = 1; del.textContent = "Delete?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3000); }
+    };
+    li.append(b, del); ul.append(li);
+  }
+}
+function setSaved(open) { $("#saved").hidden = !open; $("#btnRoutes").setAttribute("aria-pressed", open); if (open) { renderSaved(); if (innerWidth < 720) setLayers(false); } }
+$("#btnRoutes").onclick = () => setSaved($("#saved").hidden);
+function loadRoute(r) {
+  pushHistory(); pts = r.pts.map((p) => p.slice()); routeId = r.id; $("#routeName").value = r.name;
+  activity = r.activity || "ski"; document.querySelectorAll("#activity button").forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === activity));
+  $("#sheet").hidden = false; document.body.classList.add("has-route"); renderRoute();
+  const b = new maplibregl.LngLatBounds(pts[0], pts[0]); pts.forEach((p) => b.extend(p));
+  map.fitBounds(b, { padding: { top: 90, bottom: innerWidth < 720 ? 330 : 300, left: 40, right: innerWidth < 720 ? 40 : 320 }, pitch: 55, duration: 2500, maxZoom: 15 });
+}
+$("#btnSave").onclick = () => {
+  if (pts.length < 2) return toast("Add at least two points first.");
+  const list = routes(); const id = routeId || Date.now().toString(36);
+  let up = 0; if (profile) for (let i = 1; i < profile.samples.length; i++) up += Math.max(0, profile.samples[i].es - profile.samples[i - 1].es);
+  const rec = { id, name: $("#routeName").value.trim() || "Route", pts, activity, km: profile ? profile.total / 1000 : 0, up, saved: Date.now() };
+  const i = list.findIndex((x) => x.id === id); if (i >= 0) list[i] = rec; else list.unshift(rec);
+  store.set("routes", list); routeId = id; toast("Saved to My routes on this device.");
+};
+
+/* ---------- offline area download ---------- */
+function tilesInView(zMin, zMax) {
+  const b = map.getBounds(); const out = [];
+  for (let z = zMin; z <= zMax; z++) {
+    const [x0, y0] = lngLatToTile(b.getWest(), b.getNorth(), z).map(Math.floor);
+    const [x1, y1] = lngLatToTile(b.getEast(), b.getSouth(), z).map(Math.floor);
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) out.push([z, x, y]);
+  }
+  return out;
+}
+$("#btnOffline").onclick = async () => {
+  const msg = $("#offlineMsg");
+  if (!("caches" in window) || !navigator.serviceWorker || !navigator.serviceWorker.controller) {
+    msg.textContent = "Offline saving needs the app to be opened from an https address (not a local file). Everything else works."; return;
+  }
+  const z0 = Math.max(8, Math.floor(map.getZoom()) - 1);
+  const base = prefs.basemap === "topo" ? "topo" : "sat";
+  const urls = [];
+  for (const [z, x, y] of tilesInView(z0, Math.min(z0 + 4, 16))) {
+    if (z <= DEM_MAX) urls.push(DEM_URL.replace("{z}", z).replace("{x}", x).replace("{y}", y));
+    if (base === "sat") urls.push(`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`);
+    else if (z <= 17) urls.push(`https://a.tile.opentopomap.org/${z}/${x}/${y}.png`);
+  }
+  if (urls.length > 6000) { msg.textContent = `That's ${urls.length.toLocaleString()} tiles. Zoom in closer and try again.`; return; }
+  const btn = $("#btnOffline"); btn.disabled = true;
+  const cache = await caches.open("steepline-tiles-v1"); let done = 0, failed = 0;
+  const q = urls.slice();
+  async function worker() { while (q.length) { const u = q.shift(); try { const r = await fetch(u, { mode: "cors" }); if (r.ok) await cache.put(u, r); else failed++; } catch { failed++; } done++; if (done % 20 === 0) msg.textContent = `Saving tiles ${done.toLocaleString()} / ${urls.length.toLocaleString()}`; } }
+  await Promise.all(Array.from({ length: 6 }, worker));
+  btn.disabled = false;
+  msg.textContent = `Saved ${(done - failed).toLocaleString()} tiles for offline use${failed ? ` (${failed} failed)` : ""}.`;
+};
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+
+addEventListener("keydown", (e) => {
+  if (e.target.matches("input")) return;
+  if (e.key === "Escape" && drawing) setDrawing(false);
+  if ((e.metaKey || e.ctrlKey) && e.key === "z" && drawing) { e.preventDefault(); $("#btnUndo").click(); }
+});
+</script>
+</body>
+</html>

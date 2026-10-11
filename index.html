@@ -110,6 +110,10 @@ body.has-route #readout{display:none}
 #profileEmpty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:0 20px}
 #sheetFoot{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 #sheetFoot .grow{flex:1}
+.iconbtn.sm{width:36px;height:36px;border-radius:10px;background:var(--glass-2)}
+.iconbtn.sm svg{width:16px;height:16px}
+#btnClose.armed{width:auto;padding:0 10px;font-weight:600;color:#ffb4b4}
+@media (min-width:721px){ body.layers-open #sheet{right:298px} }
 #activity{width:auto}
 #activity.seg{grid-template-columns:repeat(2,auto)}
 #activity.seg button{padding:7px 10px}
@@ -149,8 +153,16 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
   #searchWrap{max-width:none}
   #layers{left:12px;right:12px;width:auto;top:auto;bottom:calc(12px + var(--safe-b));max-height:60%}
   body.layers-open .maplibregl-ctrl-top-right{right:0}
-  #stats{grid-template-columns:repeat(3,minmax(0,1fr))}
-  #profileWrap{height:100px}
+  #stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 6px}
+  #stats .v{font-size:15px}
+  #sheet{padding:10px 12px 12px;gap:8px}
+  #routeName{font-size:18px}
+  #profileWrap{height:96px}
+  #profileEmpty{font-size:12px}
+  #sheetFoot{gap:6px;flex-wrap:nowrap}
+  #sheetFoot .btn{padding:7px 10px;font-size:13px}
+  #sheetFoot .wide{display:none}
+  #readout{bottom:calc(40px + var(--safe-b))}
   #saved{left:12px;right:12px;width:auto}
   #readout{gap:10px}
   #readout .v{font-size:13px}
@@ -235,6 +247,7 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
       <button data-v="ski" aria-pressed="true">Ski tour</button>
       <button data-v="hike" aria-pressed="false">Hike</button>
     </div>
+    <button class="iconbtn sm" id="btnClose" title="Close route" aria-label="Close route"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
   </div>
   <div id="stats">
     <div><span class="label">Distance</span><span class="v" id="sDist">0<small>km</small></span></div>
@@ -250,7 +263,7 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
     <button class="btn" id="btnReverse">Reverse</button>
     <button class="btn" id="btnClear">Clear</button>
     <span class="grow"></span>
-    <button class="btn" id="btnGpx">Export GPX</button>
+    <button class="btn" id="btnGpx"><span class="wide">Export </span>GPX</button>
     <button class="btn primary" id="btnSave">Save</button>
   </div>
 </section>
@@ -287,7 +300,7 @@ const PLACES = [
 /* ---------- storage helpers (never throw) ---------- */
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
-  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
 };
 function toast(msg, ms = 2600) {
   const t = $("#toast"); t.textContent = msg; t.classList.remove("off");
@@ -365,20 +378,36 @@ async function encodePng(rgba) {
   c.getContext("2d").putImageData(new ImageData(rgba, 256, 256), 0, 0);
   return (await c.convertToBlob({ type: "image/png" })).arrayBuffer();
 }
+// The DEM is ~25-30 m source data resampled into finer tiles, so slope is measured over at least
+// SLOPE_BASE_M; differencing neighbouring pixels at z14+ turns resampling steps into false stripes.
+const SLOPE_BASE_M = 25, SLOPE_MAX_Z = 13, BORDER = 4;
+async function getDemPadded(z, x, y) { // tile plus a BORDER-pixel border from its neighbours, so slopes are seamless
+  const W = 256 + 2 * BORDER, out = new Float32Array(W * W);
+  const tiles = await Promise.all([-1, 0, 1].flatMap((dy) => [-1, 0, 1].map((dx) => getDem(z, x + dx, y + dy))));
+  const mid = tiles[4]; if (!mid) return null;
+  for (let r = 0; r < W; r++) for (let c = 0; c < W; c++) {
+    const sr = r - BORDER, sc = c - BORDER, ty = sr < 0 ? 0 : sr > 255 ? 2 : 1, tx = sc < 0 ? 0 : sc > 255 ? 2 : 1;
+    const t = tiles[ty * 3 + tx];
+    out[r * W + c] = t ? t[((sr + 256) % 256) * 256 + ((sc + 256) % 256)] : mid[Math.min(255, Math.max(0, sr)) * 256 + Math.min(255, Math.max(0, sc))];
+  }
+  return out;
+}
 maplibregl.addProtocol("slope", async (params) => {
   const [z, x, y] = params.url.replace("slope://", "").split("/").map(Number);
-  const dem = await getDem(z, x, y);
+  const dem = await getDemPadded(z, x, y);
   const out = new Uint8ClampedArray(65536 * 4);
   if (dem) {
-    const n = 2 ** z;
+    const n = 2 ** z, W = 256 + 2 * BORDER;
     for (let r = 0; r < 256; r++) {
       const lat = Math.atan(Math.sinh(Math.PI * (1 - (2 * (y + (r + 0.5) / 256)) / n)));
       const px = (40075016.686 * Math.cos(lat)) / (256 * n);
-      const ru = r > 0 ? r - 1 : r, rd = r < 255 ? r + 1 : r;
+      const k = Math.min(BORDER, Math.max(1, Math.round(SLOPE_BASE_M / px)));
       for (let c = 0; c < 256; c++) {
-        const cl = c > 0 ? c - 1 : c, cr = c < 255 ? c + 1 : c;
-        const dzdx = (dem[r * 256 + cr] - dem[r * 256 + cl]) / (px * (cr - cl));
-        const dzdy = (dem[rd * 256 + c] - dem[ru * 256 + c]) / (px * (rd - ru));
+        // Horn's 3x3 kernel with spacing k pixels
+        const i0 = (r + BORDER) * W + c + BORDER, u = i0 - k * W, d = i0 + k * W;
+        const a = dem[u - k], b = dem[u], cc = dem[u + k], l = dem[i0 - k], rr = dem[i0 + k], g = dem[d - k], h = dem[d], ii = dem[d + k];
+        const dzdx = (cc + 2 * rr + ii - (a + 2 * l + g)) / (8 * k * px);
+        const dzdy = (g + 2 * h + ii - (a + 2 * b + cc)) / (8 * k * px);
         const deg = (Math.atan(Math.hypot(dzdx, dzdy)) * 180) / Math.PI;
         const col = slopeColor(deg);
         if (col) { const i = (r * 256 + c) * 4; out[i] = col[0]; out[i + 1] = col[1]; out[i + 2] = col[2]; out[i + 3] = col[3]; }
@@ -409,7 +438,7 @@ const style = {
     topo: { type: "raster", tileSize: 256, maxzoom: 17, tiles: ["https://a.tile.opentopomap.org/{z}/{x}/{y}.png", "https://b.tile.opentopomap.org/{z}/{x}/{y}.png", "https://c.tile.opentopomap.org/{z}/{x}/{y}.png"], attribution: "© <a href='https://opentopomap.org'>OpenTopoMap</a> (CC-BY-SA), © OpenStreetMap contributors" },
     terrain: { type: "raster-dem", encoding: "terrarium", tileSize: 256, maxzoom: DEM_MAX, tiles: [DEM_URL], attribution: "Elevation: Mapzen Terrain Tiles on AWS" },
     shade: { type: "raster-dem", encoding: "terrarium", tileSize: 256, maxzoom: DEM_MAX, tiles: [DEM_URL] },
-    slope: { type: "raster", tileSize: 256, minzoom: 10, maxzoom: DEM_MAX, tiles: ["slope://{z}/{x}/{y}"] },
+    slope: { type: "raster", tileSize: 256, minzoom: 10, maxzoom: SLOPE_MAX_Z, tiles: ["slope://{z}/{x}/{y}"] },
     hiking: { type: "raster", tileSize: 256, maxzoom: 18, tiles: ["https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png"], attribution: "Trails © <a href='https://waymarkedtrails.org'>Waymarked Trails</a>" },
     ski: { type: "raster", tileSize: 256, maxzoom: 18, tiles: ["https://tiles.opensnowmap.org/pistes/{z}/{x}/{y}.png"], attribution: "Pistes © <a href='https://opensnowmap.org'>OpenSnowMap</a>" },
     route: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
@@ -429,7 +458,7 @@ if (demSource) {
   style.sources.contours = { type: "vector", maxzoom: 15, tiles: [demSource.contourProtocolUrl({ thresholds: { 10: [200, 1000], 11: [100, 500], 12: [50, 250], 13: [20, 100], 14: [20, 100], 15: [10, 50] }, contourLayer: "contours", elevationKey: "ele", levelKey: "level", extent: 4096, buffer: 1 })] };
   style.layers.push(
     { id: "contour-lines", type: "line", source: "contours", "source-layer": "contours", minzoom: 10,
-      paint: { "line-color": "rgba(255,255,255,0.55)", "line-width": ["match", ["get", "level"], 1, 1.1, 0.5] } },
+      paint: { "line-color": "rgba(255,255,255,0.55)", "line-width": ["match", ["get", "level"], 1, 1.1, 0.5], "line-opacity": ["match", ["get", "level"], 1, 1, 0.6] } },
     { id: "contour-labels", type: "symbol", source: "contours", "source-layer": "contours", minzoom: 12, filter: [">", ["get", "level"], 0],
       layout: { "symbol-placement": "line", "text-size": 11, "text-field": ["concat", ["number-format", ["get", "ele"], {}], " m"], "text-font": ["Open Sans Semibold"] },
       paint: { "text-color": "#ffffff", "text-halo-color": "rgba(15,23,32,0.75)", "text-halo-width": 1.2 } });
@@ -553,11 +582,11 @@ function updateReadout(retry) {
   roRAF = 0; if (!lastLL) return;
   roTries = retry === true ? roTries + 1 : 0;
   const { lng, lat } = lastLL;
-  const z = Math.min(14, Math.max(10, Math.round(map.getZoom())));
+  const z = Math.min(SLOPE_MAX_Z, Math.max(10, Math.round(map.getZoom())));
   const get = (a, b) => elevAtSync(a, b, z);
   const e = get(lng, lat);
   $("#rElev").textContent = e == null ? "–" : Math.round(e) + " m";
-  const sa = slopeAspectFrom(get, lng, lat, Math.max(10, 4 * (40075016.686 * Math.cos((lat * Math.PI) / 180)) / (256 * 2 ** z)));
+  const sa = slopeAspectFrom(get, lng, lat, Math.max(SLOPE_BASE_M, (40075016.686 * Math.cos((lat * Math.PI) / 180)) / (256 * 2 ** z)));
   $("#rSlope").textContent = sa ? sa.slope.toFixed(0) + "°" : "–";
   $("#rAspect").textContent = sa && sa.slope > 3 ? compass(sa.aspect) : "–";
   if ((e === undefined || (sa === null && e != null)) && roTries < 25) setTimeout(() => { if (!roRAF) roRAF = requestAnimationFrame(() => updateReadout(true)); }, 120);
@@ -584,6 +613,20 @@ function setDrawing(on) {
   if (on) map.doubleClickZoom.disable(); else map.doubleClickZoom.enable();
 }
 function closeSheet() { $("#sheet").hidden = true; document.body.classList.remove("has-route"); hoverMarker.remove(); }
+let savedSig = "[]";
+const isDirty = () => pts.length > 1 && JSON.stringify(pts) !== savedSig;
+$("#btnClose").onclick = () => {
+  const btn = $("#btnClose");
+  if (isDirty() && !btn.classList.contains("armed")) {
+    btn.classList.add("armed"); btn.textContent = "Discard?";
+    clearTimeout(btn._t); btn._t = setTimeout(resetClose, 3000); return;
+  }
+  resetClose();
+  pts = []; history = []; routeId = null; savedSig = "[]"; $("#routeName").value = "New route";
+  renderRoute(); setDrawing(false); closeSheet();
+};
+const CLOSE_SVG = $("#btnClose").innerHTML;
+function resetClose() { const btn = $("#btnClose"); clearTimeout(btn._t); btn.classList.remove("armed"); btn.innerHTML = CLOSE_SVG; }
 $("#btnDraw").onclick = () => setDrawing(!drawing);
 function renderRoute() {
   const feats = [];
@@ -640,14 +683,16 @@ async function computeProfile() {
     }
     acc += L;
   }
-  const z = 14;
+  const z = SLOPE_MAX_Z;
   await Promise.all(samples.map(async (s) => { s.e = await elevAt(s.ll[0], s.ll[1], z); }));
   if (token !== profToken) return;
   const get = (a, b) => elevAtSync(a, b, z);
+  if (samples.every((s) => s.e == null)) { profile = null; drawProfile(); updateStats(); toast("Couldn't load elevation data. Check your connection."); return; }
+  samples.forEach((s, i) => { if (s.e == null) s.e = i ? samples[i - 1].e : samples.find((t) => t.e != null).e; });
   for (const s of samples) {
-    if (s.e == null) s.e = 0;
-    let sa = slopeAspectFrom(get, s.ll[0], s.ll[1], 20);
-    if (!sa) { await Promise.all([[20, 0], [-20, 0], [0, 20], [0, -20]].map(([dx, dy]) => elevAt(s.ll[0] + dx / (M_PER_DEG_LAT * Math.cos((s.ll[1] * Math.PI) / 180)), s.ll[1] + dy / M_PER_DEG_LAT, z))); sa = slopeAspectFrom(get, s.ll[0], s.ll[1], 20); }
+    const D = SLOPE_BASE_M;
+    let sa = slopeAspectFrom(get, s.ll[0], s.ll[1], D);
+    if (!sa) { await Promise.all([[D, 0], [-D, 0], [0, D], [0, -D]].map(([dx, dy]) => elevAt(s.ll[0] + dx / (M_PER_DEG_LAT * Math.cos((s.ll[1] * Math.PI) / 180)), s.ll[1] + dy / M_PER_DEG_LAT, z))); sa = slopeAspectFrom(get, s.ll[0], s.ll[1], D); }
     s.slope = sa ? sa.slope : 0;
   }
   if (token !== profToken) return;
@@ -786,6 +831,7 @@ function setSaved(open) { $("#saved").hidden = !open; $("#btnRoutes").setAttribu
 $("#btnRoutes").onclick = () => setSaved($("#saved").hidden);
 function loadRoute(r) {
   pushHistory(); pts = r.pts.map((p) => p.slice()); routeId = r.id; $("#routeName").value = r.name;
+  savedSig = r.id ? JSON.stringify(pts) : "[]";
   activity = r.activity || "ski"; document.querySelectorAll("#activity button").forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === activity));
   $("#sheet").hidden = false; document.body.classList.add("has-route"); renderRoute();
   const b = new maplibregl.LngLatBounds(pts[0], pts[0]); pts.forEach((p) => b.extend(p));
@@ -797,7 +843,8 @@ $("#btnSave").onclick = () => {
   let up = 0; if (profile) for (let i = 1; i < profile.samples.length; i++) up += Math.max(0, profile.samples[i].es - profile.samples[i - 1].es);
   const rec = { id, name: $("#routeName").value.trim() || "Route", pts, activity, km: profile ? profile.total / 1000 : 0, up, saved: Date.now() };
   const i = list.findIndex((x) => x.id === id); if (i >= 0) list[i] = rec; else list.unshift(rec);
-  store.set("routes", list); routeId = id; toast("Saved to My routes on this device.");
+  if (!store.set("routes", list)) return toast("Couldn't save: this browser's storage is full or blocked. Export GPX instead.", 4000);
+  routeId = id; savedSig = JSON.stringify(pts); toast("Saved to My routes on this device.");
 };
 
 /* ---------- offline area download ---------- */

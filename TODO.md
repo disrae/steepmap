@@ -2,7 +2,6 @@
 
 ## Next
 - [ ] **Offline areas**: draw a box, see the estimated download size, download with progress, list and delete saved areas, and ask the browser to keep the storage permanently (`navigator.storage.persist()`)
-- [ ] Turn off the workers.dev address (`"workers_dev": false`) once steepmap.ca is confirmed on your devices
 
 ## Phone app (Capacitor wrapping `web/`)
 - [ ] Background GPS hike tracking: record with the screen off, live distance and elevation, save as a route or GPX

@@ -9,7 +9,7 @@
     { "pattern": "steepmap.ca", "custom_domain": true },
     { "pattern": "www.steepmap.ca", "custom_domain": true }
   ],
-  "workers_dev": true, // TODO: set false once steepmap.ca resolves (new .ca domains take a while to publish)
+  "workers_dev": false, // steepmap.ca only
   "preview_urls": false,
   "assets": {
     // the app; trail files are excluded by web/.assetsignore and served from R2 by the Worker instead.

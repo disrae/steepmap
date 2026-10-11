@@ -1,6 +1,6 @@
 {
-  "name": "Steepline",
-  "short_name": "Steepline",
+  "name": "Steepmap",
+  "short_name": "Steepmap",
   "description": "3D backcountry map for ski touring and hiking: slope angles, contours, route planning.",
   "start_url": "./",
   "display": "standalone",

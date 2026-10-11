@@ -1,0 +1,180 @@
+# Steepmap trail layer: everything you need on top of imagery/topo for backcountry travel,
+# built from OpenStreetMap with Planetiler. See tiles/README.md for how to build a region.
+schema_name: Steepmap trails
+schema_description: Trails, ski tours, lifts, access roads, peaks, huts and water from OpenStreetMap
+attribution: <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>
+
+args:
+  area:
+    description: Geofabrik area to download (the extract that contains your bounds)
+    default: british-columbia
+  minzoom: 8
+  maxzoom: 14
+
+sources:
+  osm:
+    type: osm
+    url: '${ "geofabrik:" + args.area }'
+
+definitions:
+  name: &name
+    key: name
+    tag_value: name
+  osm_id: &osm_id
+    key: osm_id
+    value: '${ feature.id }'
+
+layers:
+  # Foot trails, coloured in the app by SAC difficulty (T1 hiking ... T6 difficult alpine).
+  - id: trails
+    features:
+      - source: osm
+        geometry: line
+        min_zoom: 10
+        include_when:
+          highway: [path, footway, bridleway, steps, via_ferrata]
+        exclude_when:
+          footway: [sidewalk, crossing, access_aisle]
+          indoor: __any__
+          area: "yes"
+        attributes:
+          - key: kind
+            type: match_value
+          - *name
+          - *osm_id
+          - key: sac_scale
+            tag_value: sac_scale
+          - key: visibility
+            tag_value: trail_visibility
+          - key: surface
+            tag_value: surface
+          - key: mtb_scale
+            tag_value: mtb:scale
+          - key: access
+            tag_value: access
+          - key: bicycle
+            tag_value: bicycle
+          - key: operator
+            tag_value: operator
+
+  # Access: forest service roads, 4x4 tracks and the roads that get you to the trailhead.
+  - id: roads
+    features:
+      - source: osm
+        geometry: line
+        min_zoom:
+          default_value: 12
+          overrides:
+            8: { highway: [motorway, trunk, primary] }
+            10: { highway: [secondary, tertiary] }
+            11: { highway: [unclassified, track] }
+        include_when:
+          highway: [motorway, trunk, primary, secondary, tertiary, unclassified, track, residential, service]
+        exclude_when:
+          service: [driveway, parking_aisle, drive-through, alley]
+          area: "yes"
+        attributes:
+          - key: kind
+            type: match_value
+          - *name
+          - *osm_id
+          - key: ref
+            tag_value: ref
+          - key: tracktype
+            tag_value: tracktype
+          - key: surface
+            tag_value: surface
+          - key: access
+            tag_value: access
+          - key: four_wd
+            tag_value: 4wd_only
+
+  # Ski runs, nordic trails and ski touring routes (piste:type=skitour).
+  - id: ski
+    features:
+      - source: osm
+        geometry: line
+        min_zoom: 10
+        include_when:
+          piste:type: [downhill, nordic, skitour, hike, sled, snow_park]
+        attributes:
+          - key: kind
+            tag_value: piste:type
+          - key: name
+            coalesce:
+              - tag_value: piste:name
+              - tag_value: name
+          - *osm_id
+          - key: difficulty
+            tag_value: piste:difficulty
+          - key: grooming
+            tag_value: piste:grooming
+
+  - id: lifts
+    features:
+      - source: osm
+        geometry: line
+        min_zoom: 10
+        include_when:
+          aerialway: [cable_car, gondola, mixed_lift, chair_lift, drag_lift, t-bar, j-bar, platter, rope_tow, magic_carpet, zip_line]
+        exclude_when:
+          aerialway: zip_line
+        attributes:
+          - key: kind
+            type: match_value
+          - *name
+          - *osm_id
+
+  # Points you navigate by. Huts and campsites mapped as areas become a point at their centre.
+  - id: pois
+    features:
+      - source: osm
+        geometry: point
+        min_zoom:
+          default_value: 12
+          overrides:
+            9: { natural: [peak, volcano] }
+        include_when:
+          natural: [peak, volcano, saddle]
+          waterway: waterfall
+          highway: trailhead
+          tourism: viewpoint
+        attributes:
+          - key: kind
+            type: match_value
+          - *name
+          - *osm_id
+          - key: ele
+            tag_value: ele
+      - source: osm
+        geometry: centroid
+        min_zoom: 11
+        include_when:
+          tourism: [alpine_hut, wilderness_hut, camp_site]
+          amenity: shelter
+        attributes:
+          - key: kind
+            type: match_value
+          - *name
+          - *osm_id
+          - key: ele
+            tag_value: ele
+          - key: fee
+            tag_value: fee
+          - key: reservation
+            tag_value: reservation
+
+  # Names for lakes and glaciers, which imagery doesn't label.
+  - id: water_labels
+    features:
+      - source: osm
+        geometry: polygon_point_on_surface
+        min_zoom: 11
+        include_when:
+          __all__:
+            - natural: [water, glacier]
+            - name: __any__
+        attributes:
+          - key: kind
+            type: match_value
+          - *name

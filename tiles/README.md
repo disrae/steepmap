@@ -1,37 +1,54 @@
-# Trail tiles
+# Map packs
 
-Steepmap's trail layer is built from OpenStreetMap with [Planetiler](https://github.com/onthegomap/planetiler) into a single `.pmtiles` file per region. The web app reads it from `web/tiles/`. You host it yourself and need no API key, so it's fine to use publicly too (OSM data is ODbL, so keep the attribution).
+Every Steepmap region has four packs. Each pack is a single `.pmtiles` file, built here into `tiles/build/` and served from Cloudflare R2:
 
-## What's in it
+| Pack | Built from | Sea to Sky size |
+|---|---|---|
+| `<region>-trails` | OpenStreetMap, schema `trails.yml`, using [Planetiler](https://github.com/onthegomap/planetiler) | 13 MB |
+| `<region>-base` | OpenStreetMap, schema `base.yml`: land cover, water, ocean, places, parks and ridges for the Topo and Winter maps | 20 MB |
+| `<region>-dem` | Mapzen Terrain Tiles (open data on AWS), zoom 0–13, by `raster.sh` | 165 MB |
+| `<region>-sat` | Sentinel-2 cloudless 2025 by EOX (CC BY-NC-SA 4.0), zoom 0–13 (10 m pixels), by `raster.sh` | 29 MB |
+
+The Worker serves single tiles out of the packs at `/t/<pack>/{z}/{x}/{y}`. When the app opens online, it downloads each pack whole to the phone, where the service worker serves the same addresses offline.
+
+## What's in the trails pack
 
 | Layer | Contents |
 |---|---|
-| `trails` | Paths, footways, steps, via ferratas, with SAC difficulty (`sac_scale`), trail visibility, surface, MTB scale and access |
+| `trails` | Paths, footways, steps and via ferratas, with SAC difficulty (`sac_scale`), trail visibility, surface, MTB scale and access |
 | `roads` | Highways down to forest service roads and 4x4 tracks (`tracktype`, `4wd_only`, access) |
-| `ski` | Ski touring trails (`piste:type=skitour`, including combined values like `hike;skitour`), runs with difficulty, nordic trails |
-| `routes` | Named routes from OSM route relations: ski traverses (Spearhead, Névé), long hikes (Howe Sound Crest, Baden-Powell), nordic and snowshoe loops, with length in km |
-| `lifts` | Gondolas, chairs, drags |
-| `pois` | Peaks, passes, huts, shelters, campsites, trailheads, viewpoints, waterfalls |
+| `ski` | Ski touring trails (`piste:type=skitour`, including combined values like `hike;skitour`), runs with difficulty, and nordic trails |
+| `routes` | Named routes from OSM route relations, with length in km: ski traverses (Spearhead, Névé), long hikes (Howe Sound Crest, Baden-Powell), nordic and snowshoe loops |
+| `lifts` | Gondolas, chairs and drags |
+| `pois` | Peaks, passes, huts, shelters, campsites, trailheads, viewpoints and waterfalls |
 | `water_labels` | Names of lakes and glaciers |
 
-The schema is `trails.yml`. Edit it to add tags or features, then rebuild. Named routes are OSM *relations*, which Planetiler's YAML schema can't read, so `build.sh` fetches them from the Overpass API and `routes_to_geojson.py` converts them into a GeoJSON source.
+Named routes are OSM *relations*, which Planetiler's YAML schema can't read. So `build.sh` fetches them from the Overpass API, and `routes_to_geojson.py` converts them into a GeoJSON source.
 
-Missing a ski tour? Add it to OpenStreetMap (tag the ways `piste:type=skitour`, or make a `route=piste` relation for a named traverse) and rebuild; it shows up here and in every other OSM map.
+If a ski tour is missing, add it to OpenStreetMap and rebuild. Tag the ways `piste:type=skitour`, or make a `route=piste` relation for a named traverse.
 
-## Build a region
+## Build and upload
 
-Needs Docker.
+Building needs Docker.
 
 ```bash
-./tiles/build.sh sea-to-sky
+npm run tiles                      # every pack for sea-to-sky (./tiles/build.sh sea-to-sky)
+./tiles/build.sh sea-to-sky trails # one pack: trails, base, dem or sat
+npm run tiles:upload               # to R2, for the live site
+npm run tiles:upload -- --local    # to the local bucket used by `npm start` and the tests
 ```
 
-The first run downloads the Geofabrik extract for the province or state into `tiles/data/` (about 1.3 GB for BC). Later builds reuse it. The finished file is copied to `web/tiles/<region>.pmtiles`. Then `npm run tiles:upload` puts it in R2 for the live site.
+Downloads are cached in `tiles/data/` and reused by later builds:
+- the Geofabrik extract (about 1.3 GB for BC)
+- the ocean polygons (about 900 MB)
+- the raster tiles
 
-To refresh with the latest OSM edits, delete `tiles/data/sources/` and build again.
+To pick up the latest OpenStreetMap edits, delete `tiles/data/sources/` and build again. Phones pick up a rebuilt pack automatically the next time the app opens online, because each pack's ETag changes when it's rebuilt.
 
 ## Add a region
 
-1. Add a line to `REGIONS` in `build.sh`: `name|geofabrik-area|west,south,east,north`. The Geofabrik area name comes from the URL on https://download.geofabrik.de (for example `british-columbia`, `alberta`, `washington`).
-2. Add the same name and bounds to `TRAIL_AREAS` in `web/index.html`.
-3. Build it.
+1. Add a line to `regions.txt`: `name|geofabrik-area|west,south,east,north`. The Geofabrik area name comes from the URL on https://download.geofabrik.de (for example `british-columbia`, `alberta` or `washington`).
+2. Add the region to `web/regions.json` with the same id and bounds. The app and the Worker both read that file.
+3. Build it, upload it and deploy.
+
+Keep regions to roughly this size. A whole region downloads to the phone, so a big one means a big download.

@@ -1,0 +1,152 @@
+# Steepmap base map: the ground under the trails. Land cover (forest, rock, glaciers), water, ocean,
+# place names, parks and ridges from OpenStreetMap, drawn by the app as the Topo and Winter maps.
+# Built by tiles/build.sh alongside trails.yml. Relief comes from the elevation pack, not from here.
+schema_name: Steepmap base
+schema_description: Land cover, water, places and parks from OpenStreetMap
+attribution: <a href="https://www.openstreetmap.org/copyright" target="_blank">&copy; OpenStreetMap contributors</a>
+
+args:
+  area:
+    description: Geofabrik area to download (the extract that contains your bounds)
+    default: british-columbia
+  minzoom: 0
+  maxzoom: 14
+
+sources:
+  osm:
+    type: osm
+    url: '${ "geofabrik:" + args.area }'
+  # The sea isn't a polygon in OpenStreetMap (only the coastline is), so use the prebuilt ocean polygons.
+  ocean:
+    type: shapefile
+    url: https://osmdata.openstreetmap.de/download/water-polygons-split-4326.zip
+
+definitions:
+  name: &name
+    key: name
+    tag_value: name
+
+layers:
+  - id: water
+    features:
+      - source: ocean
+        geometry: polygon
+        min_zoom: 0
+        attributes:
+          - key: kind
+            value: ocean
+      - source: osm
+        geometry: polygon
+        min_zoom: 6
+        include_when:
+          natural: water
+          waterway: riverbank
+          landuse: [reservoir, basin]
+        exclude_when:
+          water: [wastewater, pond]
+        attributes:
+          - key: kind
+            value: lake
+
+  - id: waterways
+    features:
+      - source: osm
+        geometry: line
+        min_zoom:
+          default_value: 12
+          overrides:
+            8: { waterway: river }
+        include_when:
+          waterway: [river, stream, canal]
+        exclude_when:
+          tunnel: [culvert, "yes"]
+        attributes:
+          - key: kind
+            type: match_value
+          - *name
+
+  # What the ground is made of. Drawn as soft fills on Topo and as tree/rock texture on Winter.
+  - id: landcover
+    features:
+      - source: osm
+        geometry: polygon
+        min_zoom:
+          default_value: 9
+          overrides:
+            6: { natural: glacier }
+            11: { landuse: [residential, commercial, industrial, retail, farmland, meadow, grass], leisure: [park, golf_course] }
+        include_when:
+          natural: [wood, scrub, heath, grassland, glacier, bare_rock, scree, shingle, wetland, beach, sand]
+          landuse: [forest, meadow, grass, residential, commercial, industrial, retail, farmland, quarry]
+          leisure: [park, golf_course]
+        attributes:
+          - key: kind
+            value:
+              forest: { natural: wood, landuse: forest }
+              scrub: { natural: [scrub, heath] }
+              grass: { natural: grassland, landuse: [meadow, grass], leisure: [park, golf_course] }
+              glacier: { natural: glacier }
+              rock: { natural: [bare_rock, scree, shingle], landuse: quarry }
+              wetland: { natural: wetland }
+              sand: { natural: [beach, sand] }
+              farm: { landuse: farmland }
+              urban: otherwise
+
+  # Provincial parks and protected areas: outlines and a name.
+  - id: parks
+    features:
+      - source: osm
+        geometry: polygon
+        min_zoom: 7
+        include_when:
+          boundary: [national_park, protected_area]
+          leisure: nature_reserve
+        attributes:
+          - *name
+  - id: park_labels
+    features:
+      - source: osm
+        geometry: polygon_point_on_surface
+        min_zoom: 8
+        include_when:
+          __all__:
+            - boundary: [national_park, protected_area]
+            - name: __any__
+        attributes:
+          - *name
+
+  # Towns and named spots.
+  - id: places
+    features:
+      - source: osm
+        geometry: point
+        min_zoom:
+          default_value: 13
+          overrides:
+            5: { place: city }
+            7: { place: town }
+            10: { place: village }
+            12: { place: hamlet }
+        include_when:
+          __all__:
+            - place: [city, town, village, hamlet, locality, island]
+            - name: __any__
+        attributes:
+          - key: kind
+            type: match_value
+          - *name
+          - key: population
+            tag_value: population
+
+  # Named ridges, valleys and cliffs: the names FATMAP-style maps write along the terrain.
+  - id: terrain_lines
+    features:
+      - source: osm
+        geometry: line
+        min_zoom: 11
+        include_when:
+          natural: [ridge, arete, valley, cliff]
+        attributes:
+          - key: kind
+            type: match_value
+          - *name

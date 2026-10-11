@@ -3,16 +3,16 @@
   "private": true,
   "description": "Steepmap: 3D backcountry map. The app itself is static and lives in web/; this file is only for dev tools and tests.",
   "scripts": {
-    "start": "serve web -l 4173",
+    "start": "wrangler dev --port 4173 --local-upstream localhost:4173",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "trails": "./tiles/build.sh",
+    "tiles": "./tiles/build.sh",
     "deploy": "wrangler deploy",
-    "tiles:upload": "./tiles/upload.sh",
-    "dev": "wrangler dev"
+    "tiles:upload": "./tiles/upload.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
+    "pmtiles": "^3.2.1",
     "serve": "^14.2.6",
     "wrangler": "^4.149.0"
   }

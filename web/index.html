@@ -104,6 +104,30 @@ input[type=range]{width:100%;accent-color:var(--ice)}
 .btn.primary{background:var(--ice);color:var(--ink);border-color:var(--ice)}
 .btn:disabled{opacity:.4;cursor:default}
 
+/* offline maps */
+#offline{position:absolute;top:calc(64px + var(--safe-t));right:12px;width:320px;max-height:calc(100% - 80px - var(--safe-t) - var(--safe-b));overflow:auto;padding:14px;z-index:4;display:flex;flex-direction:column;gap:16px}
+.btn.sm{padding:6px 10px;font-size:12px}
+.meter{height:6px;border-radius:6px;background:var(--glass-2);overflow:hidden}
+.meter div{height:100%;width:0;background:var(--ice);transition:width .3s}
+.region{display:flex;flex-direction:column;gap:6px}
+.region h3{margin:0;font:700 17px/1.1 var(--display);letter-spacing:.03em}
+.offlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.offlist li{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line);font-size:13px;min-width:0}
+.offlist li:first-child{border-top:0}
+.offlist .nm{flex:1;min-width:0}
+.offlist .nm small{display:block;color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.offlist .st{font:500 11px/1 var(--mono);color:var(--muted);white-space:nowrap}
+.offlist .st.ok{color:#7be08a}
+.offlist .del{border:0;background:none;color:var(--muted);padding:6px}
+.bar{height:3px;border-radius:3px;background:var(--glass-2);margin-top:4px;overflow:hidden}
+.bar div{height:100%;background:var(--ice)}
+#btnOffline{position:relative}
+#btnOffline i{position:absolute;inset:-1px;border-radius:var(--r);pointer-events:none}
+#btnOffline[data-state="sync"] i{border:2px solid transparent;background:conic-gradient(var(--ice) calc(var(--p,0)*1%),transparent 0) border-box;
+  -webkit-mask:linear-gradient(#000 0 0) padding-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+#btnOffline[data-state="ready"] i::after{content:"";position:absolute;right:5px;top:5px;width:8px;height:8px;border-radius:50%;background:#7be08a;box-shadow:0 0 0 2px var(--ink)}
+#btnOffline[data-state="error"] i::after{content:"";position:absolute;right:5px;top:5px;width:8px;height:8px;border-radius:50%;background:#ffb44d;box-shadow:0 0 0 2px var(--ink)}
+
 /* cursor readout */
 #readout{position:absolute;left:12px;bottom:calc(12px + var(--safe-b));padding:8px 12px;display:flex;gap:14px;z-index:2;pointer-events:none}
 #readout div{display:flex;flex-direction:column;gap:3px}
@@ -162,8 +186,7 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
 .hover-marker{width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid var(--ice);box-shadow:0 0 0 3px rgba(0,0,0,.3)}
 
 @media (max-width:720px){
-  #brand b{display:none}
-  #brand{padding:8px 10px}
+  #brand{display:none} /* on a phone the map is the brand; search gets the room */
   #spacer{display:none}
   #searchWrap{max-width:none}
   #layers{left:12px;right:12px;width:auto;top:auto;bottom:calc(12px + var(--safe-b));max-height:60%}
@@ -179,6 +202,7 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
   #sheetFoot .wide{display:none}
   #readout{bottom:calc(40px + var(--safe-b))}
   #saved{left:12px;right:12px;width:auto}
+  #offline{left:12px;right:12px;width:auto;top:auto;bottom:calc(12px + var(--safe-b));max-height:70%}
   #readout{gap:10px}
   #readout .v{font-size:13px}
 }
@@ -201,6 +225,7 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
   <div id="spacer"></div>
   <button id="btnRoutes" class="iconbtn" title="My routes" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
   <button id="btnDraw" class="iconbtn" title="Plan a route" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="5" cy="18" r="2"/><circle cx="19" cy="6" r="2"/><path d="M7 17c4-1 3-6 6-8s4-2 4-2"/></svg></button>
+  <button id="btnOffline" class="iconbtn" title="Offline maps" aria-pressed="false" data-state="idle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.9-8.9A6 6 0 0 1 17.7 8 4.5 4.5 0 0 1 17 18"/><path d="M12 11v8m-3-3 3 3 3-3"/></svg><i aria-hidden="true"></i></button>
   <button id="btnLayers" class="iconbtn" title="Map layers" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg></button>
 </div>
 
@@ -221,7 +246,7 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
       <div class="legend-l"><span>25°</span><span>30°</span><span>35°</span><span>40°</span><span>45°</span><span>50°+</span></div>
     </div>
     <label class="toggle"><input type="checkbox" id="ovContours" checked><span>Contours</span></label>
-    <label class="toggle"><input type="checkbox" id="ovHillshade"><span>Hillshade</span></label>
+    <label class="toggle"><input type="checkbox" id="ovHillshade"><span>Hillshade<small>On satellite. Topo and Winter always have it</small></span></label>
     <label class="toggle"><input type="checkbox" id="ovTrails" checked><span>Trails, roads &amp; huts<small>Tap a trail for details</small></span></label>
     <div id="trailLegend" class="tlegend">
       <span><svg viewBox="0 0 28 6"><path d="M1 3h26"/></svg>T1–T2</span>
@@ -244,17 +269,30 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
     <span class="label">Go to</span>
     <div id="places"></div>
   </div>
-  <div class="group">
-    <span class="label">Offline</span>
-    <button class="btn" id="btnOffline">Save this area for offline</button>
-    <span class="small" id="offlineMsg">Caches map tiles for what's on screen. Works when the app is hosted on https.</span>
-  </div>
 </div>
 
 <div id="saved" class="panel" hidden>
   <div class="row"><span class="label">My routes</span><label class="btn" style="font-size:12px">Import GPX<input type="file" id="gpxIn" accept=".gpx,application/gpx+xml" hidden></label></div>
   <ul id="savedList"></ul>
   <span class="small" id="savedEmpty">No saved routes yet. Plan one with the route button, then press Save.</span>
+</div>
+
+<div id="offline" class="panel" hidden aria-label="Offline maps">
+  <div class="row"><span class="label">Offline maps</span><button class="btn sm" id="btnSync">Check for updates</button></div>
+  <div class="group">
+    <div class="meter"><div id="offMeter"></div></div>
+    <span class="small" id="offStorage">Checking storage…</span>
+  </div>
+  <div id="offRegions"></div>
+  <div class="group">
+    <div class="row"><span class="label">Saved areas</span><button class="btn sm" id="btnSaveArea">Save this view</button></div>
+    <ul class="offlist" id="offAreas"></ul>
+    <span class="small" id="offAreasEmpty">For sharp satellite on a trip, zoom to the area and save it. Saving a planned route also saves the imagery along it.</span>
+  </div>
+  <div class="group">
+    <div class="row"><span class="label">Recently viewed</span><button class="btn sm" id="btnClearViewed">Clear</button></div>
+    <span class="small" id="offViewed">Everything you look at is kept too, so places you've browsed work with no signal.</span>
+  </div>
 </div>
 
 <div id="readout" class="panel" aria-live="off">
@@ -297,12 +335,15 @@ body.has-route .maplibregl-ctrl-bottom-right,body.has-route .maplibregl-ctrl-bot
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/maplibre-contour@0.1.0/dist/index.min.js"></script>
-<script src="https://unpkg.com/pmtiles@3.2.1/dist/pmtiles.js"></script>
-<script>
-"use strict";
+<script type="module">
 const $ = (s) => document.querySelector(s);
-const DEM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
-const DEM_MAX = 15;
+/* Map data: every layer is served at /t/<layer>/{z}/{x}/{y} by our Worker (from region packs in R2) and, offline,
+   by the service worker from the same packs saved on the phone. regions.json lists the regions and their packs. */
+const { regions: REGIONS } = await fetch("regions.json").then((r) => r.json()).catch(() => ({ regions: [] }));
+const TILE = (layer) => `${location.origin}/t/${layer}/{z}/{x}/{y}`;
+const REGION_BOUNDS = REGIONS.length ? REGIONS.reduce((b, r) => [Math.min(b[0], r.bounds[0]), Math.min(b[1], r.bounds[1]), Math.max(b[2], r.bounds[2]), Math.max(b[3], r.bounds[3])], [180, 90, -180, -90]) : undefined;
+const DEM_URL = TILE("dem");
+const DEM_MAX = 13; // BC elevation data is ~20 m, which zoom 13 already holds; MapLibre upsamples beyond that
 const SLOPE_CLASSES = [ // [minDeg, rgba]
   [50, [43, 47, 107, 235]],
   [45, [139, 42, 158, 225]],
@@ -370,13 +411,13 @@ function sampleDem(dem, fx, fy) { // bilinear inside one tile (pixel space)
   const a = dem[y0 * 256 + x0], b = dem[y0 * 256 + x1], c = dem[y1 * 256 + x0], d = dem[y1 * 256 + x1];
   return (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty;
 }
-async function elevAt(lng, lat, z = 14) {
+async function elevAt(lng, lat, z = DEM_MAX) {
   const [fx, fy] = lngLatToTile(lng, lat, z);
   const tx = Math.floor(fx), ty = Math.floor(fy);
   const dem = await getDem(z, tx, ty);
   return dem ? sampleDem(dem, (fx - tx) * 256, (fy - ty) * 256) : null;
 }
-function elevAtSync(lng, lat, z = 14) {
+function elevAtSync(lng, lat, z = DEM_MAX) {
   const [fx, fy] = lngLatToTile(lng, lat, z);
   const tx = Math.floor(fx), ty = Math.floor(fy);
   const p = demCache.get(z + "/" + tx + "/" + ty);
@@ -454,59 +495,75 @@ try {
 /* ---------- style ---------- */
 const TOUCH = matchMedia("(pointer:coarse)").matches;
 const view = store.get("view", { center: PLACES[0][1], zoom: PLACES[0][2], bearing: PLACES[0][3], pitch: 66 });
+const OSM_CREDIT = "© <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors";
 const style = {
   version: 8,
-  glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
+  glyphs: `${location.origin}/fonts/{fontstack}/{range}.pbf`,
   sky: {
     "sky-color": "#6fa8dc", "horizon-color": "#dbe9f4", "fog-color": "#e6eef5",
     "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.7, "fog-ground-blend": 0.85, "atmosphere-blend": ["interpolate", ["linear"], ["zoom"], 0, 1, 12, 0.6, 15, 0.2],
   },
   sources: {
+    // Satellite is two layers: our Sentinel-2 mosaic (10 m, saved offline for the whole region) under Esri's sharp
+    // imagery (online, plus whatever you've viewed or saved). Offline, any spot you haven't viewed shows Sentinel-2.
+    s2: { type: "raster", tileSize: 256, maxzoom: 13, bounds: REGION_BOUNDS, tiles: [TILE("sat")], attribution: "Sentinel-2 cloudless 2025 by <a href='https://s2maps.eu'>EOX</a> (Copernicus Sentinel data)" },
     sat: { type: "raster", tileSize: 256, maxzoom: 19, tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"], attribution: "Imagery © Esri, Maxar, Earthstar Geographics" },
-    topo: { type: "raster", tileSize: 256, maxzoom: 17, tiles: ["https://a.tile.opentopomap.org/{z}/{x}/{y}.png", "https://b.tile.opentopomap.org/{z}/{x}/{y}.png", "https://c.tile.opentopomap.org/{z}/{x}/{y}.png"], attribution: "© <a href='https://opentopomap.org'>OpenTopoMap</a> (CC-BY-SA), © OpenStreetMap contributors" },
-    terrain: { type: "raster-dem", encoding: "terrarium", tileSize: 256, maxzoom: DEM_MAX, tiles: [DEM_URL], attribution: "Elevation: Mapzen Terrain Tiles on AWS" },
+    // Topo and Winter are drawn from our own base map inside our regions; OpenTopoMap fills in elsewhere.
+    base: { type: "vector", maxzoom: 14, bounds: REGION_BOUNDS, tiles: [TILE("base")], attribution: OSM_CREDIT },
+    regions: { type: "geojson", data: { type: "FeatureCollection", features: REGIONS.map((r) => { const [w, s, e, n] = r.bounds;
+      return { type: "Feature", properties: { id: r.id }, geometry: { type: "Polygon", coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] } }; }) } },
+    topo: { type: "raster", tileSize: 256, maxzoom: 17, tiles: ["https://a.tile.opentopomap.org/{z}/{x}/{y}.png", "https://b.tile.opentopomap.org/{z}/{x}/{y}.png", "https://c.tile.opentopomap.org/{z}/{x}/{y}.png"], attribution: "© <a href='https://opentopomap.org'>OpenTopoMap</a> (CC-BY-SA)" },
+    terrain: { type: "raster-dem", encoding: "terrarium", tileSize: 256, maxzoom: DEM_MAX, tiles: [DEM_URL], attribution: "Elevation: Mapzen Terrain Tiles (CDEM, SRTM)" },
     shade: { type: "raster-dem", encoding: "terrarium", tileSize: 256, maxzoom: DEM_MAX, tiles: [DEM_URL] },
     slope: { type: "raster", tileSize: 256, minzoom: 10, maxzoom: SLOPE_MAX_Z, tiles: ["slope://{z}/{x}/{y}"] },
     hiking: { type: "raster", tileSize: 256, maxzoom: 18, tiles: ["https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png"], attribution: "Trails © <a href='https://waymarkedtrails.org'>Waymarked Trails</a>" },
     ski: { type: "raster", tileSize: 256, maxzoom: 18, tiles: ["https://tiles.opensnowmap.org/pistes/{z}/{x}/{y}.png"], attribution: "Pistes © <a href='https://opensnowmap.org'>OpenSnowMap</a>" },
     route: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
   },
-  layers: [
-    { id: "bg", type: "background", paint: { "background-color": "#f4f7fa" } },
-    { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": -0.1, "raster-contrast": 0.08 } },
-    { id: "topo", type: "raster", source: "topo", layout: { visibility: "none" } },
-    { id: "hillshade", type: "hillshade", source: "shade", layout: { visibility: "none" },
-      paint: { "hillshade-exaggeration": 0.6, "hillshade-shadow-color": "#2e4057", "hillshade-highlight-color": "#ffffff", "hillshade-accent-color": "#5b7083", "hillshade-illumination-direction": 315 } },
-    { id: "slope", type: "raster", source: "slope", minzoom: 10, paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0, 11, 0.6], "raster-resampling": "linear", "raster-fade-duration": 150 } },
-    { id: "hiking", type: "raster", source: "hiking", layout: { visibility: "none" }, paint: { "raster-opacity": 0.9 } },
-    { id: "ski", type: "raster", source: "ski", layout: { visibility: "none" } },
-  ],
+  layers: [{ id: "bg", type: "background", paint: { "background-color": "#f4f7fa" } }],
 };
+const S = style.layers, add = (group, def) => { def.id = group; def.metadata = { group }; S.push(def); return def; };
+const BASE_LAYERS = []; // drawn only on Topo and Winter
+const base = (group, def) => { def.source = def.source || "base"; BASE_LAYERS.push(group); return add(group, def); };
+add("topo", { type: "raster", source: "topo", layout: { visibility: "none" } });
+// inside our regions, cover OpenTopoMap with plain ground and draw our own map on it
+base("region-land", { type: "fill", source: "regions", paint: { "fill-color": "#ecefe2" } });
+base("landcover", { type: "fill", "source-layer": "landcover", paint: { "fill-color": "#bcd5a3", "fill-antialias": false } });
+base("glacier-edge", { type: "line", "source-layer": "landcover", minzoom: 10, filter: ["==", ["get", "kind"], "glacier"], paint: { "line-color": "#a9d4ef", "line-width": 0.8 } });
+base("water", { type: "fill", "source-layer": "water", paint: { "fill-color": "#a6cfe8" } });
+base("waterways", { type: "line", "source-layer": "waterways", layout: { "line-cap": "round" },
+  paint: { "line-color": "#82b9dd", "line-width": ["interpolate", ["linear"], ["zoom"], 9, ["match", ["get", "kind"], "river", 1, 0.3], 15, ["match", ["get", "kind"], "river", 4, 1.4]] } });
+base("parks", { type: "line", "source-layer": "parks", paint: { "line-color": "#4f8f3f", "line-width": 1.2, "line-opacity": 0.55, "line-dasharray": [4, 2] } });
+add("s2", { type: "raster", source: "s2", paint: { "raster-saturation": -0.1, "raster-contrast": 0.08 } });
+add("sat", { type: "raster", source: "sat", paint: { "raster-saturation": -0.1, "raster-contrast": 0.08 } });
+add("hillshade", { type: "hillshade", source: "shade", layout: { visibility: "none" },
+  paint: { "hillshade-exaggeration": 0.6, "hillshade-shadow-color": "#2e4057", "hillshade-highlight-color": "#ffffff", "hillshade-accent-color": "#5b7083", "hillshade-illumination-direction": 315 } });
+add("slope", { type: "raster", source: "slope", minzoom: 10, paint: { "raster-opacity": ["interpolate", ["linear"], ["zoom"], 10, 0, 11, 0.6], "raster-resampling": "linear", "raster-fade-duration": 150 } });
+add("hiking", { type: "raster", source: "hiking", layout: { visibility: "none" }, paint: { "raster-opacity": 0.9 } });
+add("ski", { type: "raster", source: "ski", layout: { visibility: "none" } });
+base("cliffs", { type: "line", "source-layer": "terrain_lines", minzoom: 12, filter: ["==", ["get", "kind"], "cliff"], paint: { "line-color": "#7b6f66", "line-width": 1.2 } });
+const TEXT_FONT = ["Noto Sans Medium"], ITALIC = ["Noto Sans Italic"];
 if (demSource) {
   style.sources.contours = { type: "vector", maxzoom: 15, tiles: [demSource.contourProtocolUrl({ thresholds: { 10: [200, 1000], 11: [100, 500], 12: [50, 250], 13: [20, 100], 14: [20, 100], 15: [10, 50] }, contourLayer: "contours", elevationKey: "ele", levelKey: "level", extent: 4096, buffer: 1 })] };
-  style.layers.push(
-    { id: "contour-lines", type: "line", source: "contours", "source-layer": "contours", minzoom: 10,
-      paint: { "line-color": "rgba(255,255,255,0.55)", "line-width": ["match", ["get", "level"], 1, 1.1, 0.5], "line-opacity": ["match", ["get", "level"], 1, 1, 0.6] } },
-    { id: "contour-labels", type: "symbol", source: "contours", "source-layer": "contours", minzoom: 12, filter: [">", ["get", "level"], 0],
-      layout: { "symbol-placement": "line", "text-size": 11, "text-field": ["concat", ["number-format", ["get", "ele"], {}], " m"], "text-font": ["Open Sans Semibold"] },
-      paint: { "text-color": "#ffffff", "text-halo-color": "rgba(15,23,32,0.75)", "text-halo-width": 1.2 } });
+  add("contour-lines", { type: "line", source: "contours", "source-layer": "contours", minzoom: 10,
+    paint: { "line-color": "rgba(255,255,255,0.55)", "line-width": ["match", ["get", "level"], 1, 1.1, 0.5], "line-opacity": ["match", ["get", "level"], 1, 1, 0.6] } });
+  add("contour-labels", { type: "symbol", source: "contours", "source-layer": "contours", minzoom: 12, filter: [">", ["get", "level"], 0],
+    layout: { "symbol-placement": "line", "text-size": 11, "text-field": ["concat", ["number-format", ["get", "ele"], {}], " m"], "text-font": TEXT_FONT },
+    paint: { "text-color": "#ffffff", "text-halo-color": "rgba(15,23,32,0.75)", "text-halo-width": 1.2 } });
 }
-/* ---------- Steepmap trail tiles (OpenStreetMap, built by tiles/build.sh) ---------- */
+
+/* ---------- Steepmap trails (OpenStreetMap, built by tiles/build.sh) ---------- */
 // Difficulty is drawn with dash patterns, not colour, so trails never read as slope-angle shading.
-const TRAIL_AREAS = [{ id: "sea-to-sky", name: "Sea to Sky", bounds: [-123.65, 49.25, -122.4, 50.5] }];
-const pmProtocol = typeof pmtiles !== "undefined" ? new pmtiles.Protocol() : null;
-if (pmProtocol) maplibregl.addProtocol("pmtiles", pmProtocol.tile);
-const trailsUrl = (a) => new URL(`tiles/${a.id}.pmtiles`, location.href).href;
+const TRAIL_LAYERS = [];
+const L = (group, def) => { def.source = "trails"; TRAIL_LAYERS.push(add(group, def)); };
+style.sources.trails = { type: "vector", minzoom: 8, maxzoom: 14, bounds: REGION_BOUNDS, tiles: [TILE("trails")], attribution: "Trails " + OSM_CREDIT };
 const SAC = { // sac_scale -> [label, line style]
   hiking: ["T1 · Hiking", "solid"], mountain_hiking: ["T2 · Mountain hiking", "solid"],
   demanding_mountain_hiking: ["T3 · Demanding mountain hiking", "dash"],
   alpine_hiking: ["T4 · Alpine route", "dot"], demanding_alpine_hiking: ["T5 · Demanding alpine route", "dot"], difficult_alpine_hiking: ["T6 · Difficult alpine route", "dot"],
 };
 const sacIs = (style) => ["in", ["get", "sac_scale"], ["literal", Object.keys(SAC).filter((k) => SAC[k][1] === style)]];
-const TRAIL_LAYERS = [], TEXT_FONT = ["Open Sans Semibold"];
-if (pmProtocol && location.protocol !== "file:") for (const a of TRAIL_AREAS) {
-  const src = "trails-" + a.id, L = (id, def) => { def.id = id + "-" + a.id; def.source = src; def.metadata = { group: id }; TRAIL_LAYERS.push(def); };
-  style.sources[src] = { type: "vector", url: "pmtiles://" + trailsUrl(a), attribution: "Trails © <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors" };
+{
   const w = (base) => ["interpolate", ["exponential", 1.6], ["zoom"], 10, base * 0.5, 14, base, 17, base * 2.2];
   // access roads and forest service roads
   L("roads-casing", { type: "line", "source-layer": "roads", minzoom: 10, filter: ["!=", ["get", "kind"], "service"], layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "rgba(20,28,36,.55)", "line-width": w(4) } });
@@ -533,14 +590,24 @@ if (pmProtocol && location.protocol !== "file:") for (const a of TRAIL_AREAS) {
   L("ski-tours", { type: "line", "source-layer": "ski", minzoom: 10, filter: ["==", ["get", "kind"], "skitour"], paint: { "line-width": w(2.2), "line-color": "#ff5bd6", "line-dasharray": [2, 1.2] } });
   L("lifts-casing", { type: "line", "source-layer": "lifts", minzoom: 10, paint: { "line-color": "rgba(255,255,255,.8)", "line-width": w(3.4) } });
   L("lifts", { type: "line", "source-layer": "lifts", minzoom: 10, paint: { "line-color": "#111111", "line-width": w(1.6) } });
-  // labels
-  const halo = { "text-color": "#ffffff", "text-halo-color": "rgba(15,23,32,0.85)", "text-halo-width": 1.4 };
+}
+// labels: place and terrain names on every map, then trail labels on top
+const halo = { "text-color": "#ffffff", "text-halo-color": "rgba(15,23,32,0.85)", "text-halo-width": 1.4 };
+add("terrain-labels", { type: "symbol", source: "base", "source-layer": "terrain_lines", minzoom: 12, filter: ["all", ["has", "name"], ["!=", ["get", "kind"], "cliff"]],
+  layout: { "symbol-placement": "line", "text-field": ["get", "name"], "text-font": ITALIC, "text-size": 12, "text-letter-spacing": 0.08, "symbol-spacing": 400 }, paint: { ...halo, "text-color": "#e8eef3" } });
+add("park-labels", { type: "symbol", source: "base", "source-layer": "park_labels", minzoom: 8, maxzoom: 12,
+  layout: { "text-field": ["get", "name"], "text-font": ITALIC, "text-size": 12, "text-max-width": 8 }, paint: { ...halo, "text-color": "#cfe9c4" } });
+add("place-labels", { type: "symbol", source: "base", "source-layer": "places",
+  layout: { "text-field": ["get", "name"], "text-font": TEXT_FONT, "text-max-width": 8,
+    "text-size": ["match", ["get", "kind"], "city", 16, "town", 14, "village", 12.5, 11.5],
+    "symbol-sort-key": ["match", ["get", "kind"], "city", 0, "town", 1, "village", 2, 3] }, paint: halo });
+{
   const routeLabel = (id, filter, color) => L(id, { type: "symbol", "source-layer": "routes", minzoom: 11, filter,
     layout: { "symbol-placement": "line", "text-field": ["get", "name"], "text-font": TEXT_FONT, "text-size": 12.5, "symbol-spacing": 500, "text-letter-spacing": 0.03 },
     paint: { ...halo, "text-color": color } });
   routeLabel("routes-hike-labels", ["==", ["get", "kind"], "hiking"], "#b6f5d2");
   routeLabel("routes-ski-labels", ["in", ["get", "kind"], ["literal", ["skitour", "nordic", "snowshoe"]]], "#ffc4ef");
-  L("water-labels", { type: "symbol", "source-layer": "water_labels", minzoom: 12, layout: { "text-field": ["get", "name"], "text-font": TEXT_FONT, "text-size": 11, "text-max-width": 8 }, paint: { ...halo, "text-color": ["match", ["get", "kind"], "glacier", "#e8f6ff", "#aee3ff"] } });
+  L("water-labels", { type: "symbol", "source-layer": "water_labels", minzoom: 12, layout: { "text-field": ["get", "name"], "text-font": ITALIC, "text-size": 11, "text-max-width": 8 }, paint: { ...halo, "text-color": ["match", ["get", "kind"], "glacier", "#e8f6ff", "#aee3ff"] } });
   L("trail-labels", { type: "symbol", "source-layer": "trails", minzoom: 13.5, filter: ["has", "name"], layout: { "symbol-placement": "line", "text-field": ["get", "name"], "text-font": TEXT_FONT, "text-size": 11, "symbol-spacing": 320 }, paint: halo });
   L("road-labels", { type: "symbol", "source-layer": "roads", minzoom: 13, filter: ["any", ["has", "name"], ["has", "ref"]], layout: { "symbol-placement": "line", "text-field": ["coalesce", ["get", "name"], ["get", "ref"]], "text-font": TEXT_FONT, "text-size": 10.5, "symbol-spacing": 400 }, paint: { ...halo, "text-color": "#f3e3bf" } });
   L("ski-labels", { type: "symbol", "source-layer": "ski", minzoom: 13.5, filter: ["has", "name"], layout: { "symbol-placement": "line", "text-field": ["get", "name"], "text-font": TEXT_FONT, "text-size": 11, "symbol-spacing": 320 }, paint: { ...halo, "text-color": "#ffd1f3" } });
@@ -556,9 +623,51 @@ if (pmProtocol && location.protocol !== "file:") for (const a of TRAIL_AREAS) {
       "symbol-sort-key": ["-", 0, ele] },
     paint: halo });
 }
-style.layers.push(...TRAIL_LAYERS);
 const SKI_GROUP = ["routes-ski", "routes-ski-labels", "ski-casing", "ski-runs", "ski-tours", "lifts-casing", "lifts", "ski-labels"];
-const trailLayerIds = (ski) => TRAIL_LAYERS.filter((l) => SKI_GROUP.includes(l.metadata.group) === ski).map((l) => l.id);
+const trailLayerIds = (ski) => TRAIL_LAYERS.filter((l) => SKI_GROUP.includes(l.id) === ski).map((l) => l.id);
+
+/* ---------- base map themes ----------
+   Satellite wants white lines and labels with dark halos; the light Topo and Winter maps want the reverse.
+   Winter is the summer map under snow: open ground goes white, forest stays dark, lakes freeze, shadows go blue. */
+const LANDCOVER = {
+  topo: { forest: "#bcd5a3", scrub: "#d3e2bd", grass: "#e1ebcb", farm: "#e9ecd2", glacier: "#f2f9fd", rock: "#d9d3ca", wetland: "#cfe3dc", sand: "#efe6c8", urban: "#e2ddd6", land: "#ecefe2" },
+  winter: { forest: "#8fa497", scrub: "#d3ddd8", grass: "#f5f7f9", farm: "#f3f5f6", glacier: "#fbfdff", rock: "#d2d6da", wetland: "#eef2f4", sand: "#eef1f3", urban: "#e3e4e6", land: "#f5f7f9" },
+};
+const coverColor = (c) => ["match", ["get", "kind"], ...Object.entries(c).filter(([k]) => k !== "land").flat(), c.land];
+const LIGHT_HALO = "rgba(255,255,255,0.9)", DARK_HALO = "rgba(15,23,32,0.85)";
+function themePaint(b) {
+  const light = b !== "sat", winter = b === "winter", t = [];
+  const set = (id, prop, v) => t.push([id, prop, v]);
+  if (light) {
+    const c = LANDCOVER[b];
+    set("region-land", "fill-color", c.land); set("landcover", "fill-color", coverColor(c));
+    set("water", "fill-color", winter ? ["match", ["get", "kind"], "ocean", "#8db4cc", "#d3e3ed"] : "#a6cfe8");
+    set("waterways", "line-color", winter ? "#a9c4d6" : "#82b9dd");
+    set("parks", "line-color", winter ? "#6f8f9f" : "#4f8f3f");
+    set("cliffs", "line-color", winter ? "#55606b" : "#7b6f66");
+    set("bg", "background-color", winter ? "#f5f7f9" : "#f4f7fa");
+  }
+  set("hillshade", "hillshade-exaggeration", winter ? 0.7 : light ? 0.42 : 0.45);
+  set("hillshade", "hillshade-shadow-color", winter ? "#4f647a" : light ? "#3d4e5c" : "#2e4057");
+  set("hillshade", "hillshade-accent-color", winter ? "#8aa0b4" : light ? "#6b7b6b" : "#5b7083");
+  set("contour-lines", "line-color", winter ? "rgba(80,105,130,0.5)" : light ? "rgba(150,105,60,0.5)" : "rgba(255,255,255,0.55)");
+  set("contour-labels", "text-color", winter ? "#3f566d" : light ? "#8a5f34" : "#ffffff");
+  // lines: white on imagery, dark brown on paper
+  set("trails-casing", "line-color", light ? "rgba(255,255,255,0.85)" : "rgba(15,23,32,.75)");
+  for (const s of ["solid", "dash", "dot"]) set("trails-" + s, "line-color", light ? "#3a2418" : "#ffffff");
+  set("tracks", "line-color", light ? "#a37b45" : "#e2cc9f");
+  set("roads-casing", "line-color", light ? "rgba(110,90,60,.55)" : "rgba(20,28,36,.55)");
+  // labels
+  const text = { "place-labels": ["#25313b", "#ffffff"], "terrain-labels": ["#6b5a48", "#e8eef3"], "park-labels": ["#3f7a32", "#cfe9c4"],
+    "trail-labels": ["#3a2418", "#ffffff"], "poi-labels": ["#1f2a33", "#ffffff"], "road-labels": ["#5b4a33", "#f3e3bf"], "ski-labels": ["#9c1478", "#ffd1f3"],
+    "routes-hike-labels": ["#1f7a4d", "#b6f5d2"], "routes-ski-labels": ["#b0168f", "#ffc4ef"], "contour-labels": [null, null],
+    "water-labels": [["match", ["get", "kind"], "glacier", "#4d7d9c", "#2f6f9f"], ["match", ["get", "kind"], "glacier", "#e8f6ff", "#aee3ff"]] };
+  for (const [id, [dark, white]] of Object.entries(text)) {
+    if (dark !== null) set(id, "text-color", light ? dark : white);
+    set(id, "text-halo-color", light ? LIGHT_HALO : DARK_HALO);
+  }
+  return t;
+}
 
 style.layers.push(
   { id: "route-casing", type: "line", source: "route", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#0f1720", "line-width": 7, "line-opacity": 0.6 } },
@@ -575,7 +684,7 @@ const map = new maplibregl.Map({
   maxPitch: 85, attributionControl: { compact: true }, fadeDuration: 150,
 });
 window.map = map;
-map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+map.addControl(new maplibregl.NavigationControl({ showZoom: false, visualizePitch: true }), "top-right"); // compass only: pinch, scroll and double-tap zoom
 const geolocate = new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true, showAccuracyCircle: true });
 map.addControl(geolocate, "top-right");
 map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
@@ -641,23 +750,20 @@ const prefs = Object.assign({ basemap: "sat", slope: true, contours: true, hills
 const savePrefs = () => store.set("prefs", prefs);
 function vis(id, on) { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); }
 function applyBasemap() {
-  const b = prefs.basemap;
-  vis("sat", b === "sat"); vis("topo", b === "topo");
-  // Winter: a clean white relief, the shading does the work.
-  const winter = b === "winter";
-  vis("hillshade", winter || prefs.hillshade);
-  if (map.getLayer("hillshade")) {
-    map.setPaintProperty("hillshade", "hillshade-exaggeration", winter ? 0.75 : 0.45);
-    map.setPaintProperty("hillshade", "hillshade-accent-color", winter ? "#8aa0b4" : "#5b7083");
-  }
-  if (map.getLayer("contour-lines")) {
-    const dark = b !== "sat";
-    map.setPaintProperty("contour-lines", "line-color", dark ? "rgba(70,90,110,0.55)" : "rgba(255,255,255,0.55)");
-    map.setPaintProperty("contour-labels", "text-color", dark ? "#2d4155" : "#ffffff");
-    map.setPaintProperty("contour-labels", "text-halo-color", dark ? "rgba(255,255,255,0.85)" : "rgba(15,23,32,0.75)");
-  }
+  const b = prefs.basemap, light = b !== "sat";
+  vis("sat", !light); vis("s2", !light); vis("topo", b === "topo" && !insideRegions());
+  for (const id of BASE_LAYERS) vis(id, light);
+  // Topo and Winter get their relief from the hillshade; on Satellite the photo already has shadows.
+  vis("hillshade", light || prefs.hillshade);
+  for (const [id, prop, v] of themePaint(b)) if (map.getLayer(id)) map.setPaintProperty(id, prop, v);
   document.querySelectorAll("#basemap button").forEach((x) => x.setAttribute("aria-pressed", x.dataset.v === b));
 }
+// OpenTopoMap is only for outside our regions; skip loading it when the whole view is covered by our own map
+function insideRegions() {
+  const v = map.getBounds();
+  return REGIONS.some((r) => v.getWest() >= r.bounds[0] && v.getSouth() >= r.bounds[1] && v.getEast() <= r.bounds[2] && v.getNorth() <= r.bounds[3]);
+}
+map.on("moveend", () => { if (prefs.basemap === "topo") vis("topo", !insideRegions()); });
 function applyOverlays() {
   vis("slope", prefs.slope); $("#slopeLegend").hidden = !prefs.slope;
   vis("contour-lines", prefs.contours); vis("contour-labels", prefs.contours);
@@ -694,8 +800,8 @@ function setLayers(open) {
   $("#layers").hidden = !open; $("#btnLayers").setAttribute("aria-pressed", open);
   document.body.classList.toggle("layers-open", open);
 }
-setLayers(innerWidth >= 720);
-$("#btnLayers").onclick = () => { setLayers($("#layers").hidden); if (!$("#layers").hidden) setSaved(false); };
+setLayers(false); // the map first; layers are one tap away
+$("#btnLayers").onclick = () => { setLayers($("#layers").hidden); if (!$("#layers").hidden) { setSaved(false); setOffline(false); } };
 
 /* ---------- search (Nominatim) ---------- */
 let searchT;
@@ -748,11 +854,9 @@ map.on("mousemove", (e) => { lastLL = e.lngLat; if (!roRAF) roRAF = requestAnima
 map.on("click", (e) => { if (!drawing) { lastLL = e.lngLat; updateReadout(); } });
 
 /* ---------- trail details on tap ---------- */
-$("#trailCoverage").textContent = !pmProtocol || location.protocol === "file:"
-  ? "Steepmap trails need the app served from a web address (see README). Use the worldwide overlays below for now."
-  : `Built for: ${TRAIL_AREAS.map((a) => a.name).join(", ")}. Elsewhere, use the worldwide overlays below.`;
+$("#trailCoverage").textContent = `Mapped for ${REGIONS.map((a) => a.name).join(", ")}. Elsewhere, use the worldwide overlays below.`;
 const TAPPABLE = ["poi-dots", "lifts", "ski-tours", "ski-runs", "trails-solid", "trails-dash", "trails-dot", "tracks", "roads", "routes-ski", "routes-hike"];
-const tappableIds = () => TRAIL_LAYERS.filter((l) => TAPPABLE.includes(l.metadata.group)).map((l) => l.id).filter((id) => map.getLayer(id));
+const tappableIds = () => TAPPABLE.filter((id) => map.getLayer(id));
 const nice = (v) => v && String(v).replace(/[_:]/g, " ").replace(/^./, (c) => c.toUpperCase());
 const KIND = {
   path: "Trail", footway: "Footpath", bridleway: "Bridleway", steps: "Stairs", via_ferrata: "Via ferrata",
@@ -799,7 +903,7 @@ function tappedFeature(point) {
   const ids = tappableIds(); if (!ids.length) return null;
   const r = TOUCH ? 12 : 5;
   const hits = map.queryRenderedFeatures([[point.x - r, point.y - r], [point.x + r, point.y + r]], { layers: ids });
-  const rank = (f) => TAPPABLE.indexOf(TRAIL_LAYERS.find((l) => l.id === f.layer.id).metadata.group);
+  const rank = (f) => TAPPABLE.indexOf(f.layer.id);
   hits.sort((a, b) => rank(a) - rank(b));
   if (!hits[0]) return null;
   // named routes this spot belongs to, for "Part of" on a trail's details
@@ -999,7 +1103,7 @@ function toGpx(name, coords, elev) {
 }
 $("#btnGpx").onclick = async () => {
   if (pts.length < 2) return toast("Add at least two points first.");
-  const elev = await Promise.all(pts.map((p) => elevAt(p[0], p[1], 14)));
+  const elev = await Promise.all(pts.map((p) => elevAt(p[0], p[1])));
   const name = $("#routeName").value.trim() || "Route";
   const blob = new Blob([toGpx(name, pts, elev)], { type: "application/gpx+xml" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = name.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-") + ".gpx";
@@ -1042,13 +1146,13 @@ function renderSaved() {
     b.onclick = () => { loadRoute(r); setSaved(false); };
     const del = document.createElement("button"); del.className = "del"; del.title = "Delete"; del.textContent = "✕";
     del.onclick = () => {
-      if (del.dataset.armed) { store.set("routes", routes().filter((x) => x.id !== r.id)); renderSaved(); toast("Route deleted."); }
+      if (del.dataset.armed) { store.set("routes", routes().filter((x) => x.id !== r.id)); deleteArea("route-" + r.id); renderSaved(); toast("Route deleted."); }
       else { del.dataset.armed = 1; del.textContent = "Delete?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3000); }
     };
     li.append(b, del); ul.append(li);
   }
 }
-function setSaved(open) { $("#saved").hidden = !open; $("#btnRoutes").setAttribute("aria-pressed", open); if (open) { renderSaved(); if (innerWidth < 720) setLayers(false); } }
+function setSaved(open) { $("#saved").hidden = !open; $("#btnRoutes").setAttribute("aria-pressed", open); if (open) { renderSaved(); setOffline(false); if (innerWidth < 720) setLayers(false); } }
 $("#btnRoutes").onclick = () => setSaved($("#saved").hidden);
 function loadRoute(r) {
   pushHistory(); pts = r.pts.map((p) => p.slice()); routeId = r.id; $("#routeName").value = r.name;
@@ -1065,48 +1169,258 @@ $("#btnSave").onclick = () => {
   const rec = { id, name: $("#routeName").value.trim() || "Route", pts, activity, km: profile ? profile.total / 1000 : 0, up, saved: Date.now() };
   const i = list.findIndex((x) => x.id === id); if (i >= 0) list[i] = rec; else list.unshift(rec);
   if (!store.set("routes", list)) return toast("Couldn't save: this browser's storage is full or blocked. Export GPX instead.", 4000);
-  routeId = id; savedSig = JSON.stringify(pts); toast("Saved to My routes on this device.");
+  routeId = id; savedSig = JSON.stringify(pts);
+  if (canOffline) { saveArea(routeArea(rec)); toast("Saved. The satellite imagery along it is being kept for offline."); }
+  else toast("Saved to My routes on this device.");
 };
 
-/* ---------- offline area download ---------- */
-function tilesInView(zMin, zMax, pad = 0) {
-  const b = map.getBounds(); const out = [];
-  for (let z = zMin; z <= zMax; z++) {
-    const n = 2 ** z;
-    const [x0, y0] = lngLatToTile(b.getWest(), b.getNorth(), z).map(Math.floor);
-    const [x1, y1] = lngLatToTile(b.getEast(), b.getSouth(), z).map(Math.floor);
-    for (let x = x0 - pad; x <= x1 + pad; x++) for (let y = Math.max(0, y0 - pad); y <= Math.min(n - 1, y1 + pad); y++) out.push([z, ((x % n) + n) % n, y]);
+/* ---------- offline maps ----------
+   Region packs (trails, topo, elevation, satellite overview) download automatically whenever the app is open
+   and online, and update when they're rebuilt. Saved areas add sharp satellite for a trip. Everything else
+   you look at is kept by the service worker as "recently viewed". See sw.js for how tiles are served. */
+const PACK_CACHE = "steepmap-packs-v1", SAVED_CACHE = "steepmap-saved-v1", VIEWED_CACHE = "steepmap-viewed-v1";
+const PACK_NAMES = { trails: "Trails, huts & ski routes", base: "Topo & winter map", dem: "Terrain: 3D, slope & contours", sat: "Satellite overview (10 m)" };
+const ESRI = (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+const canOffline = "caches" in window && "serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost");
+const offline = Object.assign({ regions: {}, areas: [] }, store.get("offline", {}));
+const saveOffline = () => store.set("offline", offline);
+const keepRegion = (r) => offline.regions[r.id] !== false;
+const packUrl = (r, p) => new URL(`tiles/${r.id}-${p}.pmtiles`, location.href).href;
+const packState = new Map(); // url -> { state: queued|downloading|saved|missing|error, got, total, bytes, etag }
+const fmtBytes = (b) => !b ? "0 MB" : b < 1e6 ? "<1 MB" : b < 1e9 ? Math.round(b / 1e6) + " MB" : (b / 1e9).toFixed(1) + " GB";
+const tellSW = () => navigator.serviceWorker?.controller?.postMessage({ type: "packs-changed" });
+
+let syncing = null;
+function syncPacks() {
+  if (!canOffline) return Promise.resolve();
+  return syncing ||= (async () => {
+    navigator.storage?.persist?.().catch(() => {}); // ask the browser not to clear our storage when space runs low
+    const cache = await caches.open(PACK_CACHE);
+    const todo = [];
+    for (const r of REGIONS) for (const p of r.packs) {
+      const url = packUrl(r, p), have = await cache.match(url);
+      if (!keepRegion(r)) { if (have) { await cache.delete(url); tellSW(); } packState.delete(url); continue; }
+      packState.set(url, have ? { state: "saved", bytes: +have.headers.get("content-length") || 0, etag: have.headers.get("etag") } : { state: "queued" });
+      todo.push(url);
+    }
+    renderOffline();
+    for (const url of todo) {
+      const st = packState.get(url);
+      let head;
+      try { head = await fetch(url, { method: "HEAD", cache: "no-store" }); } catch { break; } // offline: keep what we have
+      if (!head.ok) { if (st.state !== "saved") st.state = "missing"; continue; }
+      const etag = head.headers.get("etag"), total = +head.headers.get("content-length") || 0;
+      if (st.state === "saved" && etag && st.etag === etag) continue;
+      const had = st.state === "saved";
+      Object.assign(st, { state: "downloading", got: 0, total, update: had });
+      renderOffline();
+      try {
+        await downloadPack(cache, url, etag, total, (got) => { st.got = got; renderProgress(); });
+        Object.assign(st, { state: "saved", bytes: total, etag }); tellSW();
+      } catch (e) {
+        console.warn("Pack download failed", url, e); st.state = had ? "saved" : "error";
+      }
+      renderOffline();
+    }
+    offline.lastSync = Date.now(); saveOffline();
+  })().finally(() => { syncing = null; renderOffline(); });
+}
+async function downloadPack(cache, url, etag, total, onProgress) {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok || !res.body) throw new Error("HTTP " + res.status);
+  let got = 0;
+  const counted = res.body.pipeThrough(new TransformStream({ transform(chunk, c) { got += chunk.byteLength; onProgress(got); c.enqueue(chunk); } }));
+  // streamed straight into storage, so a 170 MB pack never sits in memory; the old copy stays until this one is complete
+  await cache.put(url, new Response(counted, { headers: { "Content-Type": "application/octet-stream", "Content-Length": String(total), ETag: etag || "" } }));
+  if (total && got !== total) { await cache.delete(url); throw new Error(`incomplete: ${got} of ${total} bytes`); }
+}
+
+/* saved areas: tile lists for a box or along a route */
+function tileXY(lng, lat, z) { return lngLatToTile(lng, lat, z).map(Math.floor); }
+function tilesInBounds([w, s, e, n], z, pad = 0) {
+  const [x0, y0] = tileXY(w, n, z), [x1, y1] = tileXY(e, s, z), max = 2 ** z - 1, out = [];
+  for (let x = Math.max(0, x0 - pad); x <= Math.min(max, x1 + pad); x++) for (let y = Math.max(0, y0 - pad); y <= Math.min(max, y1 + pad); y++) out.push([z, x, y]);
+  return out;
+}
+function tilesAlong(pts, z, pad) { // tiles within `pad` tiles of the route line
+  const seen = new Set(), out = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[Math.min(i + 1, pts.length - 1)], [ax, ay] = lngLatToTile(a[0], a[1], z), [bx, by] = lngLatToTile(b[0], b[1], z);
+    const steps = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) * 2));
+    for (let k = 0; k <= steps; k++) {
+      const cx = Math.floor(ax + ((bx - ax) * k) / steps), cy = Math.floor(ay + ((by - ay) * k) / steps);
+      for (let dx = -pad; dx <= pad; dx++) for (let dy = -pad; dy <= pad; dy++) {
+        const key = (cx + dx) + "/" + (cy + dy); if (seen.has(key)) continue; seen.add(key); out.push([z, cx + dx, cy + dy]);
+      }
+    }
   }
   return out;
 }
-const demTileUrl = (z, x, y) => DEM_URL.replace("{z}", z).replace("{x}", x).replace("{y}", y);
-$("#btnOffline").onclick = async () => {
-  const msg = $("#offlineMsg");
-  if (!("caches" in window) || !navigator.serviceWorker || !navigator.serviceWorker.controller) {
-    msg.textContent = "Offline saving needs the app to be opened from an https address (not a local file). Everything else works."; return;
+const inRegion = (b) => REGIONS.some((r) => keepRegion(r) && b[0] >= r.bounds[0] && b[1] >= r.bounds[1] && b[2] <= r.bounds[2] && b[3] <= r.bounds[3]);
+function areaUrls(a) {
+  const urls = new Set(), outside = !inRegion(a.bounds);
+  for (let z = a.z0; z <= a.z1; z++) {
+    for (const [, x, y] of a.pts ? tilesAlong(a.pts, z, z >= 15 ? 1 : 0) : tilesInBounds(a.bounds, z)) {
+      urls.add(ESRI(z, x, y));
+      if (outside && z <= 16) urls.add(`https://a.tile.opentopomap.org/${z}/${x}/${y}.png`); // our regions have their own topo
+    }
   }
-  const z0 = Math.max(8, Math.floor(map.getZoom()) - 1), z1 = Math.min(z0 + 4, 16);
-  const urls = new Set();
-  // Slope shading and contours are computed from z10-13 elevation tiles plus their neighbours, whatever the view zoom.
-  for (const [z, x, y] of tilesInView(Math.max(10, Math.min(z0, 13)), 13, 1)) urls.add(demTileUrl(z, x, y));
-  for (const [z, x, y] of tilesInView(z0, z1)) {
-    if (z <= DEM_MAX) urls.add(demTileUrl(z, x, y));
-    if (prefs.basemap === "sat") urls.add(`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`);
-    else if (prefs.basemap === "topo" && z <= 17) urls.add(`https://a.tile.opentopomap.org/${z}/${x}/${y}.png`);
-  }
-  if (urls.size > 6000) { msg.textContent = `That's ${urls.size.toLocaleString()} tiles. Zoom in closer and try again.`; return; }
-  const btn = $("#btnOffline"); btn.disabled = true;
-  // Trail files are small; the service worker keeps the whole file once it has been fetched.
-  const v = map.getBounds();
-  await Promise.all(TRAIL_AREAS.filter((a) => a.bounds[0] < v.getEast() && a.bounds[2] > v.getWest() && a.bounds[1] < v.getNorth() && a.bounds[3] > v.getSouth())
-    .map((a) => fetch(trailsUrl(a), { headers: { Range: "bytes=0-0" } }).catch(() => {})));
-  const cache = await caches.open("steepmap-tiles-v1"); let done = 0, failed = 0;
-  const q = [...urls], total = q.length;
-  async function worker() { while (q.length) { const u = q.shift(); try { if (!(await cache.match(u))) { const r = await fetch(u, { mode: "cors" }); if (r.ok) await cache.put(u, r); else failed++; } } catch { failed++; } done++; if (done % 20 === 0) msg.textContent = `Saving tiles ${done.toLocaleString()} / ${total.toLocaleString()}`; } }
+  // outside our regions, also keep elevation (3D, slope shading and contours use zoom 10-13 plus neighbours)
+  if (outside) for (let z = 10; z <= DEM_MAX; z++) for (const [, x, y] of tilesInBounds(a.bounds, z, 1)) urls.add(DEM_URL.replace("{z}", z).replace("{x}", x).replace("{y}", y));
+  return urls;
+}
+function viewBounds() { // the ground you're looking at, seen from straight above (a tilted view reaches to the horizon)
+  const c = map.getCenter(), cv = map.getCanvas(), mpp = (40075016.686 * Math.cos((c.lat * Math.PI) / 180)) / (512 * 2 ** map.getZoom());
+  const dLng = (cv.clientWidth / 2) * mpp / (M_PER_DEG_LAT * Math.cos((c.lat * Math.PI) / 180)), dLat = (cv.clientHeight / 2) * mpp / M_PER_DEG_LAT;
+  return [c.lng - dLng, c.lat - dLat, c.lng + dLng, c.lat + dLat];
+}
+function placeName() { // the highest named peak in view, else a town, else coordinates
+  const hits = map.queryRenderedFeatures({ layers: ["poi-labels", "place-labels"].filter((id) => map.getLayer(id)) });
+  const peak = hits.filter((f) => f.properties.name && /peak|volcano/.test(f.properties.kind)).sort((a, b) => (parseFloat(b.properties.ele) || 0) - (parseFloat(a.properties.ele) || 0))[0];
+  const place = peak || hits.find((f) => f.properties.name);
+  if (place) return "Around " + place.properties.name;
+  const c = map.getCenter(); return `Area at ${c.lat.toFixed(3)}, ${c.lng.toFixed(3)}`;
+}
+const MAX_AREA_TILES = 12000; // about 300 MB of imagery
+const areaJobs = new Map(); // id -> { done, total }
+async function saveArea(a) {
+  if (!canOffline) { toast("Offline maps need the app opened from https://steepmap.ca."); return false; }
+  // sharpest that fits: up to zoom 17 (about 1 m per pixel), dropping a level while it's too big
+  for (a.z1 = 17; a.z1 > a.z0 && areaUrls(a).size > MAX_AREA_TILES; a.z1--);
+  const urls = [...areaUrls(a)];
+  if (urls.length > MAX_AREA_TILES) { toast("That's a big area. Zoom in a little and save again.", 3500); return false; }
+  Object.assign(a, { tiles: urls.length, bytes: 0, done: false, saved: Date.now() });
+  offline.areas = offline.areas.filter((x) => x.id !== a.id); offline.areas.unshift(a); saveOffline();
+  const job = { done: 0, total: urls.length }; areaJobs.set(a.id, job); renderOffline();
+  const saved = await caches.open(SAVED_CACHE), viewed = await caches.open(VIEWED_CACHE);
+  let bytes = 0, failed = 0;
+  const q = urls.slice();
+  const worker = async () => {
+    while (q.length) {
+      const u = q.shift();
+      try {
+        let r = await saved.match(u);
+        if (!r) {
+          r = (await viewed.match(u)) || (await fetch(u, { mode: "cors" }));
+          if (r.status === 200) { await saved.put(u, r.clone()); viewed.delete(u); } else if (r.status !== 204) failed++;
+        }
+        bytes += +r.headers.get("content-length") || (await r.blob()).size;
+      } catch { failed++; }
+      if (++job.done % 25 === 0) { a.bytes = bytes; renderProgress(); }
+    }
+  };
   await Promise.all(Array.from({ length: 6 }, worker));
-  btn.disabled = false;
-  msg.textContent = `Saved ${(done - failed).toLocaleString()} tiles${prefs.basemap === "winter" ? " (Winter map: elevation only)" : ""} plus trails for offline use${failed ? ` (${failed} failed)` : ""}.`;
+  areaJobs.delete(a.id);
+  Object.assign(a, { bytes, failed, done: failed === 0 }); saveOffline(); renderOffline();
+  return true;
+}
+async function deleteArea(id) {
+  const a = offline.areas.find((x) => x.id === id); if (!a) return;
+  offline.areas = offline.areas.filter((x) => x.id !== id); saveOffline();
+  const keep = new Set(); for (const o of offline.areas) for (const u of areaUrls(o)) keep.add(u);
+  const saved = await caches.open(SAVED_CACHE);
+  for (const u of areaUrls(a)) if (!keep.has(u)) await saved.delete(u);
+  renderOffline();
+}
+function routeArea(r) { // a saved route keeps the imagery along it, from overview to close-up
+  const b = r.pts.reduce((b, p) => [Math.min(b[0], p[0]), Math.min(b[1], p[1]), Math.max(b[2], p[0]), Math.max(b[3], p[1])], [180, 90, -180, -90]);
+  return { id: "route-" + r.id, kind: "route", name: r.name, pts: r.pts, bounds: b, z0: 11 };
+}
+
+/* the Offline maps panel */
+function renderProgress() {
+  let got = 0, total = 0;
+  for (const st of packState.values()) if (st.state === "downloading") { got += st.got || 0; total += st.total || 0; }
+  for (const j of areaJobs.values()) { got += j.done; total += j.total; }
+  const btn = $("#btnOffline"), busy = total > 0;
+  const states = [...packState.values()].map((s) => s.state);
+  btn.dataset.state = busy ? "sync" : states.includes("error") ? "error" : states.length && states.every((s) => s === "saved" || s === "missing") ? "ready" : "idle";
+  btn.style.setProperty("--p", busy ? Math.max(3, Math.round((got / total) * 100)) : 0);
+  btn.title = busy ? `Saving maps for offline… ${Math.round((got / total) * 100)}%` : btn.dataset.state === "ready" ? "Offline maps: ready" : "Offline maps";
+  for (const el of document.querySelectorAll("[data-progress]")) {
+    const st = packState.get(el.dataset.progress), job = areaJobs.get(el.dataset.progress);
+    const f = st ? (st.got || 0) / (st.total || 1) : job ? job.done / job.total : 0;
+    el.firstChild.style.width = Math.round(f * 100) + "%";
+  }
+  for (const el of document.querySelectorAll("[data-pct]")) {
+    const st = packState.get(el.dataset.pct), job = areaJobs.get(el.dataset.pct);
+    if (st && st.state === "downloading") el.textContent = `${Math.round(((st.got || 0) / (st.total || 1)) * 100)}% of ${fmtBytes(st.total)}`;
+    if (job) el.textContent = `${Math.round((job.done / job.total) * 100)}%`;
+  }
+}
+function li(name, sub, status, ok, progressKey, onDelete) {
+  const el = document.createElement("li");
+  el.innerHTML = "<span class='nm'><span></span><small></small></span><span class='st'></span>";
+  el.querySelector(".nm span").textContent = name; el.querySelector("small").textContent = sub || "";
+  const st = el.querySelector(".st"); st.textContent = status; st.classList.toggle("ok", !!ok);
+  if (progressKey) { st.dataset.pct = progressKey; const bar = document.createElement("div"); bar.className = "bar"; bar.dataset.progress = progressKey; bar.append(document.createElement("div")); el.querySelector(".nm").append(bar); }
+  if (onDelete) {
+    const del = document.createElement("button"); del.className = "del"; del.title = "Delete"; del.textContent = "✕";
+    del.onclick = () => { if (del.dataset.armed) onDelete(); else { del.dataset.armed = 1; del.textContent = "Delete?"; setTimeout(() => { delete del.dataset.armed; del.textContent = "✕"; }, 3000); } };
+    el.append(del);
+  }
+  return el;
+}
+let renderT = 0;
+function renderOffline() {
+  renderProgress();
+  if ($("#offline").hidden) return;
+  const box = $("#offRegions"); box.innerHTML = "";
+  if (!canOffline) { box.innerHTML = "<span class='small'>Offline maps need the app opened from https://steepmap.ca (or localhost).</span>"; }
+  for (const r of REGIONS) {
+    const div = document.createElement("div"); div.className = "region";
+    div.innerHTML = "<div class='row'><h3></h3><label class='toggle' style='padding:0'><span class='small' style='flex:none'>Keep offline</span><input type='checkbox'></label></div><span class='small desc'></span><ul class='offlist'></ul>";
+    div.querySelector("h3").textContent = r.name; div.querySelector(".desc").textContent = r.description || "";
+    const tog = div.querySelector("input"); tog.checked = keepRegion(r);
+    tog.onchange = () => { offline.regions[r.id] = tog.checked; saveOffline(); syncPacks(); };
+    const ul = div.querySelector("ul");
+    if (keepRegion(r)) for (const p of r.packs) {
+      const url = packUrl(r, p), st = packState.get(url) || { state: "queued" };
+      const status = { saved: fmtBytes(st.bytes) + " ✓", queued: "waiting", missing: "not built yet", error: "failed, will retry",
+        downloading: `${Math.round(((st.got || 0) / (st.total || 1)) * 100)}% of ${fmtBytes(st.total)}` }[st.state];
+      ul.append(li(PACK_NAMES[p] || p, st.state === "downloading" && st.update ? "Updating…" : "", status, st.state === "saved", st.state === "downloading" ? url : null));
+    }
+    box.append(div);
+  }
+  const areas = $("#offAreas"); areas.innerHTML = "";
+  $("#offAreasEmpty").hidden = offline.areas.length > 0;
+  for (const a of offline.areas) {
+    const job = areaJobs.get(a.id);
+    const sub = `${a.kind === "route" ? "Route" : "Area"} · satellite to zoom ${a.z1} · ${new Date(a.saved).toLocaleDateString()}`;
+    const status = job ? `${Math.round((job.done / job.total) * 100)}%` : a.done ? fmtBytes(a.bytes) + " ✓" : a.failed ? `${fmtBytes(a.bytes)}, ${a.failed} missing` : "unfinished";
+    const el = li(a.name, sub, status, !job && a.done, job ? a.id : null, () => deleteArea(a.id));
+    if (!job && !a.done && navigator.onLine) { // finish an interrupted download (closed app, lost signal)
+      const resume = document.createElement("button"); resume.className = "btn sm"; resume.textContent = "Resume"; resume.onclick = () => saveArea(a); el.insertBefore(resume, el.querySelector(".del"));
+    }
+    areas.append(el);
+  }
+  clearTimeout(renderT);
+  renderT = setTimeout(async () => { // storage numbers are slow to read; do it after the list is drawn
+    const est = await navigator.storage?.estimate?.().catch(() => null), persisted = await navigator.storage?.persisted?.().catch(() => false);
+    if (!est) { $("#offStorage").textContent = ""; return; }
+    let packs = 0; for (const st of packState.values()) if (st.state === "saved") packs += st.bytes || 0;
+    const areasB = offline.areas.reduce((t, a) => t + (a.bytes || 0), 0), viewed = Math.max(0, est.usage - packs - areasB);
+    $("#offMeter").style.width = Math.min(100, (est.usage / est.quota) * 100).toFixed(1) + "%";
+    $("#offStorage").textContent = `${fmtBytes(est.usage)} on this device, ${fmtBytes(est.quota - est.usage)} free. ` +
+      (persisted ? "Kept permanently." : "The browser may clear this if the device runs low on space; the phone app will fix that.");
+    $("#offViewed").textContent = `About ${fmtBytes(viewed)} of map you've looked at is kept too, so places you've browsed work with no signal.`;
+  }, 50);
+}
+function setOffline(open) {
+  $("#offline").hidden = !open; $("#btnOffline").setAttribute("aria-pressed", open);
+  if (open) { setSaved(false); setLayers(false); renderOffline(); }
+}
+$("#btnOffline").onclick = () => setOffline($("#offline").hidden);
+$("#btnSync").onclick = async () => { $("#btnSync").disabled = true; await syncPacks(); $("#btnSync").disabled = false; toast(navigator.onLine ? "Offline maps are up to date." : "No connection. Showing what's saved."); };
+$("#btnSaveArea").onclick = async () => {
+  const z = Math.floor(map.getZoom());
+  const a = { id: "area-" + Date.now().toString(36), kind: "area", name: placeName(), bounds: viewBounds(), z0: Math.max(8, Math.min(z - 2, 14)) };
+  if (await saveArea(a)) toast(`Saved "${a.name}" for offline.`);
 };
+$("#btnClearViewed").onclick = async () => { await caches.delete(VIEWED_CACHE); renderOffline(); toast("Cleared recently viewed maps. Region packs and saved areas are kept."); };
+addEventListener("online", () => syncPacks());
+document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - (offline.lastSync || 0) > 6 * 3600e3) syncPacks(); });
+map.once("idle", () => setTimeout(syncPacks, 1500)); // let the first view load before downloading in the background
 if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("sw.js").catch(() => {});
 
 addEventListener("keydown", (e) => {

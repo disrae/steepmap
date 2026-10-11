@@ -1,0 +1,11 @@
+{
+  "regions": [
+    {
+      "id": "sea-to-sky",
+      "name": "Sea to Sky",
+      "description": "North Shore, Howe Sound, Squamish, Garibaldi, Whistler",
+      "bounds": [-123.65, 49.25, -122.4, 50.5],
+      "packs": ["trails", "base", "dem", "sat"]
+    }
+  ]
+}

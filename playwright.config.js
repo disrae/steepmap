@@ -9,7 +9,7 @@ module.exports = defineConfig({
   workers: 1, // WebGL in software is CPU-heavy; one map at a time keeps gestures smooth
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: process.env.BASE_URL || "http://localhost:4173", // e.g. BASE_URL=http://localhost:8788 to test against `wrangler dev`
+    baseURL: process.env.BASE_URL || "http://localhost:4173", // e.g. BASE_URL=https://steepmap.ca to test the live site
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] },
@@ -19,5 +19,6 @@ module.exports = defineConfig({
     { name: "iphone-size", testMatch: "mobile.spec.js", use: { ...devices["iPhone 14"], browserName: "chromium" } },
     { name: "desktop", testMatch: "desktop.spec.js", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
   ],
-  webServer: process.env.BASE_URL ? undefined : { command: "npx serve web -l 4173 --no-clipboard", url: "http://localhost:4173", reuseExistingServer: true },
+  // The Worker with a local copy of R2: put the packs there first with `npm run tiles:upload -- --local`.
+  webServer: process.env.BASE_URL ? undefined : { command: "npx wrangler dev --port 4173 --local-upstream localhost:4173", url: "http://localhost:4173", reuseExistingServer: true, timeout: 60_000 },
 });

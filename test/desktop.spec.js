@@ -8,7 +8,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function openMap(page) {
   await page.addInitScript((v) => { try { localStorage.setItem("view", JSON.stringify(v)); } catch {} }, GROUSE);
   await page.goto("/");
-  await page.waitForFunction(() => window.map && window.map.isStyleLoaded(), null, { timeout: 60_000 });
+  await page.waitForFunction(() => window.map?.isStyleLoaded?.(), null, { timeout: 60_000 });
   // wait for full-detail terrain: the ground shape under the grabbed point must not change mid-test
   await page.waitForFunction(() => !window.map.isMoving() && window.map.loaded(), null, { timeout: 45_000 });
   await sleep(500);
@@ -56,4 +56,11 @@ test("grabbing the sky near the horizon falls back to rotating around the centre
   const c1 = await page.evaluate(() => map.getCenter().toArray());
   // centre-pivot rotation leaves the map centre where it was (no flinging off to the horizon)
   expect(Math.abs(c1[0] - c0[0]) + Math.abs(c1[1] - c0[1])).toBeLessThan(0.002);
+});
+
+test("no zoom buttons: just the compass and locate, and the layers panel starts closed", async ({ page }) => {
+  await openMap(page);
+  await expect(page.locator(".maplibregl-ctrl-zoom-in")).toHaveCount(0);
+  await expect(page.locator(".maplibregl-ctrl-compass")).toBeVisible();
+  await expect(page.locator("#layers")).toBeHidden();
 });

@@ -3,6 +3,7 @@ const { test, expect } = require("@playwright/test");
 const fs = require("fs");
 const path = require("path");
 const { touchSession, sleep } = require("./touch");
+const { groundUnder, drift } = require("./pivot");
 
 const GROUSE = { center: [-123.08, 49.375], zoom: 14, bearing: 0, pitch: 0 };
 const hasTrails = fs.existsSync(path.join(__dirname, "../web/tiles/sea-to-sky.pmtiles"));
@@ -85,6 +86,20 @@ test("two fingers dragged up tilts into 3D", async ({ page }) => {
   await settle(page);
   expect((await state(page)).pitch).toBeGreaterThan(20);
   await page.screenshot({ path: test.info().outputPath("tilted.png") });
+});
+
+test("two-finger tilt pivots around the spot between your fingers", async ({ page }) => {
+  await openMap(page, { ...GROUSE, pitch: 20 });
+  await page.waitForFunction(() => map.loaded(), null, { timeout: 45_000 }); // full-detail terrain under the grabbed spot
+  const t = await touchSession(page), v = page.viewportSize();
+  const at = [v.width * 0.5, v.height * 0.72]; // low on the screen, away from the centre
+  const ll = await groundUnder(page, at);
+  await t.tilt(at, 70, -60); // a realistic tilt; past ~65° a pivot this close would put the camera into the slope
+  await settle(page);
+  expect((await state(page)).pitch).toBeGreaterThan(35);
+  const d = await drift(page, ll, at);
+  console.log(`touch tilt: grabbed point drifted ${d.toFixed(1)}px`);
+  expect(d).toBeLessThan(30);
 });
 
 test("plan a route with taps, then drag a point with a finger", async ({ page }) => {

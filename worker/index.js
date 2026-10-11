@@ -1,9 +1,15 @@
-// Steepmap Worker: the app is static assets (web/); this script only serves trail files from R2.
+// Steepmap Worker: the app is static assets (web/). This script redirects to https://steepmap.ca and serves trail files from R2.
 // Trail .pmtiles files are read in byte ranges by the map, so Range and conditional requests are passed to R2.
+
+const HOME = "steepmap.ca";
 
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
+    // One secure address: service workers, GPS and offline storage need https, and storage is per address.
+    if ((url.hostname === HOME || url.hostname === "www." + HOME) && (url.protocol === "http:" || url.hostname !== HOME)) {
+      return Response.redirect(`https://${HOME}${url.pathname}${url.search}`, 301);
+    }
     if (url.pathname.startsWith("/tiles/")) return serveTrailFile(req, env, decodeURIComponent(url.pathname.slice("/tiles/".length)));
     return env.ASSETS.fetch(req);
   },

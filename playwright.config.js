@@ -15,8 +15,9 @@ module.exports = defineConfig({
     launchOptions: { args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] },
   },
   projects: [
-    { name: "android", use: { ...devices["Pixel 7"] } },
-    { name: "iphone-size", use: { ...devices["iPhone 14"], browserName: "chromium" } },
+    { name: "android", testMatch: "mobile.spec.js", use: { ...devices["Pixel 7"] } },
+    { name: "iphone-size", testMatch: "mobile.spec.js", use: { ...devices["iPhone 14"], browserName: "chromium" } },
+    { name: "desktop", testMatch: "desktop.spec.js", use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 } } },
   ],
   webServer: process.env.BASE_URL ? undefined : { command: "npx serve web -l 4173 --no-clipboard", url: "http://localhost:4173", reuseExistingServer: true },
 });

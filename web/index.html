@@ -569,6 +569,56 @@ map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-
 const geolocate = new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true, showAccuracyCircle: true });
 map.addControl(geolocate, "top-right");
 map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
+
+/* ---------- rotate and tilt around the point you grabbed ----------
+   MapLibre rotates (right/ctrl-drag) and tilts (that, or two fingers up/down) around the screen centre.
+   This extra gesture handler hands MapLibre's camera update an `around` point: where the gesture started.
+   Pinch and twist already pivot between the fingers, so they're left alone. Near the horizon the grabbed
+   point is far away and would fling the map, so it falls back to the centre. Uses MapLibre 4.7 internals
+   (map.handlers); test/desktop.spec.js and test/mobile.spec.js cover it if MapLibre is upgraded. */
+(function pivotAtPointer() {
+  const hm = map.handlers; if (!hm || !hm._add) return;
+  let pivot = null, pivotLL = null, active = false;
+  const usable = (p) => {
+    const tr = map.transform, horizonY = tr.height / 2 - tr.getHorizon();
+    return p && p.y > horizonY + Math.max(60, tr.height * 0.12) ? p : null;
+  };
+  const grab = (p) => { pivot = usable(p); pivotLL = pivot ? map.unproject(pivot) : null; active = false; };
+  const mid = (pts) => pts.length >= 2 ? pts[0].add(pts[1]).div(2) : null;
+  const rotating = () => map.dragRotate.isActive() || (map.touchPitch.isActive() && !map.touchZoomRotate.isActive());
+  // Like MapLibre does for drags: hold the terrain height at the centre still during the gesture, otherwise
+  // every correction below lands the centre on different ground, the camera bobs, and the spot slides again.
+  const during = () => { if (!pivot || !rotating()) return undefined; active = true; if (map.terrain) map._elevationFreeze = true; return { around: pivot }; };
+  const handler = {
+    _enabled: true,
+    isEnabled() { return this._enabled; }, isActive() { return false; }, enable() { this._enabled = true; }, disable() { this._enabled = false; },
+    reset() { pivot = pivotLL = null; active = false; },
+    mousedown(e, point) { grab(e.button === 2 || (e.button === 0 && e.ctrlKey) ? point : null); },
+    touchstart(e, points) { grab(points.length === 2 ? mid(points) : null); },
+    mousemove: during, mousemoveWindow: during, touchmove: during, touchmoveWindow: during,
+  };
+  // let it run alongside every other handler (it never blocks them or becomes "active" itself)
+  hm._add("pivotAtPointer", handler, hm._handlers.map((h) => h.handlerName));
+  // MapLibre pivots on a flat plane at the centre's elevation; on real terrain the grabbed spot can be
+  // hundreds of metres higher or lower and slides away. After each frame (including the coast after you
+  // let go), shift the map so the grabbed spot on the 3D terrain stays under the finger or cursor.
+  map.on("move", () => {
+    if (!active || !pivotLL) return;
+    const tr = map.transform;
+    for (let i = 0; i < 4; i++) { // the flat-plane step is approximate on terrain, so converge in a few passes
+      const p = map.project(pivotLL), dx = p.x - pivot.x, dy = p.y - pivot.y;
+      if (!isFinite(dx) || Math.hypot(dx, dy) < 0.5) break;
+      if (Math.hypot(dx, dy) > tr.height) { active = false; return; } // spot went over the horizon; stop chasing it
+      tr.center = tr.pointLocation(tr.centerPoint.add(new maplibregl.Point(dx, dy)));
+    }
+    map.triggerRepaint();
+  });
+  map.on("moveend", () => {
+    if (!active) return;
+    active = false;
+    if (map.terrain && !map.isMoving()) { map._elevationFreeze = false; map.transform.recalculateZoom(map.terrain); map.triggerRepaint(); }
+  });
+})();
 map.on("load", () => {
   applyTerrain();
   if (innerWidth < 720) document.querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");

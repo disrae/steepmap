@@ -6,10 +6,12 @@
     "start": "serve web -l 4173",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
-    "trails": "./tiles/build.sh"
+    "trails": "./tiles/build.sh",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",
-    "serve": "^14.2.6"
+    "serve": "^14.2.6",
+    "wrangler": "^4.149.0"
   }
 }

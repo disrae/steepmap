@@ -1,0 +1,10 @@
+// Steepmap on Cloudflare: a static-assets-only Worker serving web/. No server code; `npm run deploy`.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "steepmap",
+  "compatibility_date": "2026-10-10",
+  "assets": {
+    // plain 404s for missing files, so a missing trail file is never answered with the HTML page
+    "directory": "./web"
+  }
+}

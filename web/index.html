@@ -723,6 +723,29 @@ style.layers.push(
     paint: { "circle-radius": ["case", ["==", ["get", "i"], 0], TOUCH ? 10 : 7, TOUCH ? 8 : 5], "circle-color": ["case", ["==", ["get", "i"], 0], "#7fd3ff", "#ffffff"], "circle-stroke-color": "#0f1720", "circle-stroke-width": 2 } },
 );
 
+/* ---------- location in the phone app ----------
+   Inside the Steepmap app the web page's own location access would ask a second time ("steepmap.ca would like to
+   use your current location", again on every launch on iOS). So the app's native GPS stands in for it: the
+   position dot then uses the permission the app already has. */
+const CAP = window.capacitorExports;
+const BG_GPS = CAP?.Capacitor?.isNativePlatform?.() ? CAP.registerPlugin("BackgroundGeolocation") : null;
+if (BG_GPS) {
+  const watchers = new Map(); let next = 1;
+  const position = (l) => ({ timestamp: l.time || Date.now(), coords: { latitude: l.latitude, longitude: l.longitude, accuracy: l.accuracy,
+    altitude: l.altitude, altitudeAccuracy: l.altitudeAccuracy, heading: l.bearing, speed: l.speed } });
+  const error = (e) => ({ code: e.code === "NOT_AUTHORIZED" ? 1 : 2, message: e.message, PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 });
+  const watchPosition = (ok, fail) => {
+    const id = next++;
+    // no background message: this watcher stops when the app is closed (recording uses its own). Stale fixes are
+    // allowed so the dot appears at once when you're standing still; recording waits for fresh ones.
+    watchers.set(id, BG_GPS.addWatcher({ requestPermissions: true, stale: true }, (l, e) => e ? fail?.(error(e)) : ok(position(l))));
+    return id;
+  };
+  const clearWatch = (id) => { watchers.get(id)?.then((w) => BG_GPS.removeWatcher({ id: w })); watchers.delete(id); };
+  const getCurrentPosition = (ok, fail) => { const id = watchPosition((p) => { clearWatch(id); ok(p); }, (e) => { clearWatch(id); fail?.(e); }); };
+  Object.defineProperty(navigator, "geolocation", { value: { watchPosition, clearWatch, getCurrentPosition }, configurable: true });
+}
+
 /* ---------- map ---------- */
 const map = new maplibregl.Map({
   container: "map", style, center: view.center, zoom: view.zoom, bearing: view.bearing, pitch: view.pitch,
@@ -1262,8 +1285,6 @@ const tracksDb = (() => {
    One place that hands out position fixes. In a browser that's watchPosition, which phones pause when the
    screen locks. In the Steepmap phone app (mobile/), the Capacitor background-geolocation plugin keeps
    recording with the screen off, and shows the "recording" notification Android and iOS require. */
-const CAP = window.capacitorExports;
-const BG_GPS = CAP?.Capacitor?.isNativePlatform?.() ? CAP.registerPlugin("BackgroundGeolocation") : null;
 const gps = {
   background: !!BG_GPS,
   async start(onFix, onError) {

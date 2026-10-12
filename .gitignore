@@ -6,3 +6,5 @@ playwright-report/
 .wrangler/
 # map packs are built locally and served from R2 (npm run tiles:upload)
 tiles/build/
+# simulator builds (see mobile/README.md)
+mobile/build/

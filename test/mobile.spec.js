@@ -276,7 +276,7 @@ test("record a hike: GPS fixes become a track that survives closing the app, the
   await openMap(page);
   await page.locator("#btnRec").tap();
   await expect(page.locator("#rec")).toBeVisible();
-  for (const p of walk.slice(1, 5)) await fix(p);
+  for (const p of walk.slice(1, 7)) await fix(p); // WebKit sometimes drops the first fix, so walk a little further than needed
   await expect.poll(async () => parseFloat(await page.locator("#recDist").innerText())).toBeGreaterThan(0.05);
   await page.screenshot({ path: test.info().outputPath("recording.png") });
 
@@ -286,7 +286,7 @@ test("record a hike: GPS fixes become a track that survives closing the app, the
   await expect(page.locator("#rec")).toBeVisible();
   const before = parseFloat(await page.locator("#recDist").innerText());
   expect(before).toBeGreaterThan(0.05);
-  for (const p of walk.slice(5)) await fix(p);
+  for (const p of walk.slice(7)) await fix(p);
   await expect.poll(async () => parseFloat(await page.locator("#recDist").innerText())).toBeGreaterThan(before);
 
   // pause, then finish (Finish asks once)

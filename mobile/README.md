@@ -8,7 +8,7 @@ The app loads the live site (`server.url` in `capacitor.config.json`), so every 
 - iOS only allows service workers for an app's own listed domains, so `steepmap.ca` is in `WKAppBoundDomains`.
 - If the app is opened with no signal before it has ever loaded, it shows `www/offline.html`.
 
-The web code finds the native GPS through `web/vendor/capacitor-8.5.2.js`. When the page is running inside the app, `gps.start()` in `web/index.html` switches from the browser's `watchPosition` to the plugin.
+The web code finds the native GPS through `web/vendor/capacitor-8.5.2.js`. When the page is running inside the app, `gps.start()` in `web/index.html` switches from the browser's `watchPosition` to the plugin. The position dot uses the plugin too, so the app only asks for location once instead of WebKit asking again on every launch.
 
 ## Build
 
@@ -33,6 +33,12 @@ npx cap sync                     # after changing capacitor.config.json or plugi
 3. Under Signing & Capabilities, pick your Apple Developer team.
 4. Plug in your phone and press Run.
 5. To share with friends, use Product → Archive, then upload to TestFlight.
+
+To try it in the simulator without signing:
+```bash
+xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -derivedDataPath build/ios CODE_SIGNING_ALLOWED=NO build
+xcrun simctl install booted build/ios/Build/Products/Debug-iphonesimulator/App.app
+```
 
 Without a paid developer account, Xcode can still install it on your own phone, but the install expires after 7 days.
 
